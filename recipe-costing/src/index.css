@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@theme {
+  --color-rsa-navy: #1a2332;
+  --color-rsa-gold: #c9a959;
+  --color-rsa-red: #8b0000;
+  --color-rsa-cream: #f5f0e6;
+  --font-heading: Georgia, serif;
+}
+
+body {
+  font-family: 'Arial', sans-serif;
+  background-color: #f3f4f6;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Georgia', serif;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Focus visible for better keyboard navigation */
+*:focus-visible {
+  outline: 2px solid #c9a959;
+  outline-offset: 2px;
+}
