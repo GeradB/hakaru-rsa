@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { siteContent } from '../content';
 
 export default function Membership() {
@@ -59,6 +60,17 @@ export default function Membership() {
           <p className="text-lg text-gray-700 max-w-2xl mx-auto leading-relaxed">
             {membership.howToJoin}
           </p>
+          <div className="mt-8">
+            <Link
+              to={membership.applyLink}
+              className="inline-flex items-center bg-rsa-gold text-rsa-navy px-8 py-4 rounded-lg font-bold text-lg hover:bg-yellow-400 transition-all hover:scale-105 focus:ring-4 focus:ring-rsa-gold/50"
+            >
+              Apply for Provisional Membership
+              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

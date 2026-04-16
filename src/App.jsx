@@ -6,6 +6,7 @@ import ScrollToTopButton from './components/ScrollToTop';
 import Home from './pages/Home';
 import About from './pages/About';
 import Membership from './pages/Membership';
+import MembershipForm from './pages/MembershipForm';
 import Events from './pages/Events';
 import Contact from './pages/Contact';
 
@@ -34,6 +35,7 @@ function AppContent() {
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<About />} />
           <Route path="/membership" element={<Membership />} />
+          <Route path="/membership-form" element={<MembershipForm />} />
           <Route path="/events" element={<Events />} />
           <Route path="/contact" element={<Contact />} />
         </Routes>

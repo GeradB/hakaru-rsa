@@ -133,6 +133,7 @@ export const siteContent = {
       },
     ],
     howToJoin: `To become a member, simply visit us during opening hours with your ID and complete a membership form. For RSA membership, please bring your service documentation.`,
+    applyLink: "/membership-form",
   },
 
   // Contact Information
