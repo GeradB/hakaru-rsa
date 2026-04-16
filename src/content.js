@@ -14,9 +14,10 @@ export const siteContent = {
   navigation: {
     links: [
       { name: "Home", href: "/" },
-      { name: "About Us", href: "/about" },
+      { name: "About", href: "/about" },
       { name: "Membership", href: "/membership" },
-      { name: "Events", href: "/events" },
+      { name: "Projects", href: "/projects" },
+      { name: "Committee", href: "/committee" },
       { name: "Contact", href: "/contact" },
     ],
   },
@@ -93,6 +94,18 @@ export const siteContent = {
     title: "About Hakaru RSA",
     subtitle: "Our History & Mission",
     content: `The Hakaru & Districts RSA was established to serve the veterans and community of Hakaru and surrounding districts. We are committed to honouring the service and sacrifice of New Zealand's veterans while providing ongoing support and a vibrant social hub for our members.`,
+    rnzrsa: {
+      title: "RNZRSA Member",
+      content: `Hakaru and Districts RSA are a member of the RNZRSA. We welcome members from affiliated clubs throughout New Zealand and Australia & new members and families to our facilities at 733 Settlement Road, Hakaru.
+
+We are located no more than 10 minutes from both Kaiwaka and Mangawhai and offer our members, affiliated members and guests a great opportunity to enjoy our RSA and what it has to offer.
+
+For your enjoyment the Hakaru RSA offers you friendship, great camaraderie, pool, snooker, darts, entertainment and a restaurant & bar in a safe secure environment.
+
+We welcome all prospective members over the age of 13 to come to the RSA, check out our facilities and enjoy the friendship of our members – you are not required to be a returned service person to join.
+
+We would like to acknowledge & deeply appreciate the fantastic work our volunteers do in the running of our association, their dedication along with the patronage of our members & guests is what helps us to keep our doors open. Thank you`,
+    },
     mission: {
       title: "Our Mission",
       items: [
@@ -163,6 +176,8 @@ export const siteContent = {
       { name: "Home", href: "/" },
       { name: "About", href: "/about" },
       { name: "Membership", href: "/membership" },
+      { name: "Projects", href: "/projects" },
+      { name: "Committee", href: "/committee" },
       { name: "Contact", href: "/contact" },
     ],
   },

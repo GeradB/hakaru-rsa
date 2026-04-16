@@ -9,6 +9,8 @@ import Membership from './pages/Membership';
 import MembershipForm from './pages/MembershipForm';
 import Events from './pages/Events';
 import Contact from './pages/Contact';
+import Committee from './pages/Committee';
+import Projects from './pages/Projects';
 
 // Scroll to top on route change
 function ScrollToTopOnRouteChange() {
@@ -38,6 +40,8 @@ function AppContent() {
           <Route path="/membership-form" element={<MembershipForm />} />
           <Route path="/events" element={<Events />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/committee" element={<Committee />} />
+          <Route path="/projects" element={<Projects />} />
         </Routes>
       </main>
       <Footer />
