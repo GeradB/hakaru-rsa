@@ -126,7 +126,7 @@ export default function Home() {
               Become a member today and enjoy access to all our facilities, events, and a supportive community of veterans and locals.
             </p>
             <Link
-              to="/membership"
+              to="/membership/become"
               className="inline-flex items-center bg-rsa-navy text-white px-8 py-4 rounded-md font-bold text-lg hover:bg-slate-800 transition-all hover:scale-105 focus:ring-4 focus:ring-rsa-navy/50"
             >
               Become a Member

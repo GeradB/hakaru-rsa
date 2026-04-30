@@ -6,7 +6,9 @@ import ScrollToTopButton from './components/ScrollToTop';
 import Home from './pages/Home';
 import About from './pages/About';
 import Membership from './pages/Membership';
-import MembershipForm from './pages/MembershipForm';
+import MembershipSuccess from './pages/MembershipSuccess';
+import HakaruRSAMembership from './pages/HakaruRSAMembership';
+import HakaruRSARenewal from './pages/HakaruRSARenewal';
 import Events from './pages/Events';
 import Contact from './pages/Contact';
 import Committee from './pages/Committee';
@@ -37,7 +39,9 @@ function AppContent() {
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<About />} />
           <Route path="/membership" element={<Membership />} />
-          <Route path="/membership-form" element={<MembershipForm />} />
+          <Route path="/membership/become" element={<HakaruRSAMembership />} />
+          <Route path="/membership/renew" element={<HakaruRSARenewal />} />
+          <Route path="/membership/success" element={<MembershipSuccess />} />
           <Route path="/events" element={<Events />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/committee" element={<Committee />} />

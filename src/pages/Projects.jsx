@@ -130,7 +130,7 @@ export default function Projects() {
               Contact Us
             </Link>
             <Link
-              to="/membership"
+              to="/membership/become"
               className="inline-flex items-center border-2 border-rsa-navy text-rsa-navy px-8 py-4 rounded-lg font-bold text-lg hover:bg-rsa-navy hover:text-white transition-all"
             >
               Become a Member

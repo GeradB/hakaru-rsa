@@ -27,7 +27,7 @@ export const siteContent = {
     title: "Hakaru & Districts RSA",
     subtitle: "Honouring Service, Supporting Veterans, Building Community",
     ctaText: "Become a Member",
-    ctaLink: "/membership",
+    ctaLink: "/membership/become",
   },
 
   // Welcome/Introduction Section
@@ -146,7 +146,7 @@ We would like to acknowledge & deeply appreciate the fantastic work our voluntee
       },
     ],
     howToJoin: `To become a member, simply visit us during opening hours with your ID and complete a membership form. For RSA membership, please bring your service documentation.`,
-    applyLink: "/membership-form",
+    applyLink: "/membership/become",
   },
 
   // Contact Information

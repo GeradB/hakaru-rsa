@@ -60,14 +60,23 @@ export default function Membership() {
           <p className="text-lg text-gray-700 max-w-2xl mx-auto leading-relaxed">
             {membership.howToJoin}
           </p>
-          <div className="mt-8">
+          <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to={membership.applyLink}
-              className="inline-flex items-center bg-rsa-gold text-rsa-navy px-8 py-4 rounded-lg font-bold text-lg hover:bg-yellow-400 transition-all hover:scale-105 focus:ring-4 focus:ring-rsa-gold/50"
+              to="/membership/become"
+              className="inline-flex items-center justify-center bg-rsa-gold text-rsa-navy px-8 py-4 rounded-lg font-bold text-lg hover:bg-yellow-400 transition-all hover:scale-105 focus:ring-4 focus:ring-rsa-gold/50"
             >
-              Apply for Provisional Membership
-              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              Become a Member
+              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+            <Link
+              to="/membership/renew"
+              className="inline-flex items-center justify-center bg-rsa-navy text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-opacity-90 transition-all hover:scale-105 focus:ring-4 focus:ring-rsa-navy/50"
+            >
+              Renew Membership
+              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" />
               </svg>
             </Link>
           </div>
