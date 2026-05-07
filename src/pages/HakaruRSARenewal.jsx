@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
-import { loadStripe } from '@stripe/stripe-js';
+import { getStripe } from '../lib/stripe';
 
 const MEMBERSHIP_FEES = {
   'Returned & Service': 40,
@@ -11,9 +11,6 @@ const MEMBERSHIP_FEES = {
   'Over 90s': 0,
   'Life Member': 0,
 };
-
-const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
-const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 
 function FormSection({ title, children }) {
   return (
@@ -189,7 +186,7 @@ function StripePaymentSection({ amountNzd, currency, receiptEmail, metadata, onP
       }
     };
 
-    if (!stripePromise) return;
+    if (!getStripe()) return;
 
     const amt = Number(amountNzd);
     if (!Number.isFinite(amt) || amt <= 0) {
@@ -205,7 +202,7 @@ function StripePaymentSection({ amountNzd, currency, receiptEmail, metadata, onP
     };
   }, [apiUrl, amountNzd, currency, receiptEmail, metadataPayload]);
 
-  if (!stripePublishableKey || !stripePromise) {
+  if (!getStripe()) {
     return (
       <div className="border-2 border-dashed border-rsa-navy/30 bg-rsa-navy/5 p-6 rounded-lg">
         <p className="text-sm font-bold text-rsa-navy">Stripe is not configured</p>
@@ -240,7 +237,7 @@ function StripePaymentSection({ amountNzd, currency, receiptEmail, metadata, onP
   }
 
   return (
-    <Elements stripe={stripePromise} options={elementsOptions}>
+    <Elements stripe={getStripe()} options={elementsOptions}>
       <StripePaymentInner amountNzd={amountNzd} currency={currency} receiptEmail={receiptEmail} metadata={metadataPayload} onPaid={onPaid} />
     </Elements>
   );

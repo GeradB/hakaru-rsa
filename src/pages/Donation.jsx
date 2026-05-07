@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
-import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { apiUrl } from '../apiBase';
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+import { getStripe } from '../lib/stripe';
 
 const PRESET_AMOUNTS = [20, 50, 100];
 const INTERVALS = [
@@ -218,7 +216,7 @@ function StripePaymentSection({ amount, timing, interval, donorType, isAnonymous
             </div>
           )}
           <Elements
-            stripe={stripePromise}
+            stripe={getStripe()}
             options={{
               clientSecret,
               appearance: {
