@@ -28,6 +28,7 @@ jobs:
       - name: Build
         run: npm run build
         env:
+          VITE_API_URL: https://hakaru-api-fyfrgkgmh9a3c7gt.australiaeast-01.azurewebsites.net
           VITE_API_BASE_URL: https://hakaru-api-fyfrgkgmh9a3c7gt.australiaeast-01.azurewebsites.net
           VITE_CURRENCY: NZD
           VITE_STRIPE_PUBLISHABLE_KEY: pk_test_51TTsTdEOZAorwg9F0ekbKaByHTPCn1lVq9aVhBdRX4HnjRDccaNkzlyOv6Z4Zed4VX5b84ef9Iqw9xS0xOrF6qNI0071qXJ0BA
