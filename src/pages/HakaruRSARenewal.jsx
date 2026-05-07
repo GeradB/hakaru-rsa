@@ -249,6 +249,11 @@ function StripePaymentSection({ amountNzd, currency, receiptEmail, metadata, onP
 export default function HakaruRSARenewal() {
   const [submitted, setSubmitted] = useState(false);
   const [renewalId, setRenewalId] = useState("");
+  const [addressSearch, setAddressSearch] = useState("");
+  const [addressResults, setAddressResults] = useState([]);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [showAddressResults, setShowAddressResults] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [form, setForm] = useState({
     fullName: '',
     membershipNumber: '',
@@ -264,12 +269,88 @@ export default function HakaruRSARenewal() {
     email: '',
     consentEmail: '',
     consentAGM: '',
-    consentWomens: '',
     membershipType: '',
     donation: '',
   });
 
   const set = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+
+  // NZ Address lookup - proxied through backend to avoid CORS and rate limiting
+  const searchAddress = useCallback(async (query) => {
+    if (query.length < 3) {
+      setAddressResults([]);
+      setShowAddressResults(false);
+      return;
+    }
+
+    setAddressLoading(true);
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001";
+      const response = await fetch(`${apiUrl}/api/address/lookup?q=${encodeURIComponent(query)}`);
+      const data = await response.json();
+
+      if (Array.isArray(data)) {
+        setAddressResults(
+          data.map((item) => ({
+            id: item.place_id,
+            fullAddress: item.display_name,
+            street:
+              item.address?.road ||
+              item.address?.pedestrian ||
+              item.address?.street ||
+              "",
+            town: item.address?.town || item.address?.city || item.address?.suburb || "",
+            postcode: item.address?.postcode || "",
+          }))
+        );
+        setShowAddressResults(true);
+      }
+    } catch (error) {
+      console.error("Address lookup failed:", error);
+      setAddressResults([]);
+    } finally {
+      setAddressLoading(false);
+    }
+  }, []);
+
+  const selectAddress = (address) => {
+    set("mailingAddress", address.street);
+    set("mailingTown", address.town);
+    set("mailingPostCode", address.postcode);
+    setAddressSearch(address.fullAddress);
+    setAddressResults([]);
+    setShowAddressResults(false);
+  };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest(".address-search-container")) {
+        setShowAddressResults(false);
+      }
+    };
+    if (showAddressResults) {
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
+    }
+  }, [showAddressResults]);
+
+  // Debounce address search to avoid rate limiting
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(addressSearch);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [addressSearch]);
+
+  useEffect(() => {
+    if (debouncedSearch) {
+      searchAddress(debouncedSearch);
+    } else {
+      setAddressResults([]);
+      setShowAddressResults(false);
+    }
+  }, [debouncedSearch, searchAddress]);
 
   const fee = MEMBERSHIP_FEES[form.membershipType] ?? 0;
   const donationAmount = Number.isFinite(Number(form.donation)) ? Number(form.donation) : 0;
@@ -457,32 +538,69 @@ export default function HakaruRSARenewal() {
           <div className="space-y-8">
             <div>
               <h3 className="text-lg font-bold text-rsa-navy mb-4">Mailing address</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Field label="Street address">
-                  <input
-                    type="text"
-                    value={form.mailingAddress}
-                    onChange={(e) => set('mailingAddress', e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
-                  />
-                </Field>
-                <Field label="Town">
-                  <input
-                    type="text"
-                    value={form.mailingTown}
-                    onChange={(e) => set('mailingTown', e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
-                  />
-                </Field>
-                <Field label="Post code">
-                  <input
-                    type="text"
-                    value={form.mailingPostCode}
-                    onChange={(e) => set('mailingPostCode', e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
-                    placeholder="0000"
-                  />
-                </Field>
+              <div className="space-y-4">
+                <div className="address-search-container">
+                  <Field label="Search address">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={addressSearch}
+                        onChange={(e) => setAddressSearch(e.target.value)}
+                        onFocus={() => addressResults.length > 0 && setShowAddressResults(true)}
+                        placeholder="Start typing address to search..."
+                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
+                      />
+                      {addressLoading && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <div className="w-5 h-5 border-2 border-rsa-navy border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
+                      {showAddressResults && addressResults.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border-2 border-rsa-navy/30 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {addressResults.map((addr) => (
+                            <button
+                              key={addr.id}
+                              type="button"
+                              onClick={() => selectAddress(addr)}
+                              className="w-full px-4 py-3 text-left text-sm hover:bg-rsa-gold/10 border-b border-gray-100 last:border-0 transition-colors"
+                            >
+                              <div className="font-bold text-rsa-navy">{addr.fullAddress}</div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Search by street name, town, or postcode</p>
+                  </Field>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Field label="Street address">
+                    <input
+                      type="text"
+                      value={form.mailingAddress}
+                      onChange={(e) => set('mailingAddress', e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
+                      placeholder="Or enter manually"
+                    />
+                  </Field>
+                  <Field label="Town">
+                    <input
+                      type="text"
+                      value={form.mailingTown}
+                      onChange={(e) => set('mailingTown', e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
+                    />
+                  </Field>
+                  <Field label="Post code">
+                    <input
+                      type="text"
+                      value={form.mailingPostCode}
+                      onChange={(e) => set('mailingPostCode', e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
+                      placeholder="0000"
+                    />
+                  </Field>
+                </div>
               </div>
             </div>
 
@@ -535,15 +653,6 @@ export default function HakaruRSARenewal() {
                 <p className="text-sm text-gray-600">I consent to be contacted via email for Hakaru RSA AGMs &amp; EGMs.</p>
               </div>
               <YesNoToggle value={form.consentAGM} onChange={(v) => set('consentAGM', v)} />
-            </div>
-            <div className="flex items-start justify-between gap-6 border-2 border-rsa-navy/10 rounded-lg p-4">
-              <div>
-                <p className="font-bold text-rsa-navy">Women's section</p>
-                <p className="text-sm text-gray-600">
-                  Ladies, I consent to my contact details to be passed to the Hakaru RSA Women&apos;s section.
-                </p>
-              </div>
-              <YesNoToggle value={form.consentWomens} onChange={(v) => set('consentWomens', v)} />
             </div>
           </div>
         </FormSection>

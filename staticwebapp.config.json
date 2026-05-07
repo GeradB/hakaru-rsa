@@ -1,8 +1,62 @@
 {
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/images/*.{png,jpg,gif,svg}", "/css/*", "/js/*", "/*.{css,js,ico,png,svg}"]
+    "exclude": ["/images/*", "/css/*", "/js/*", "/assets/*", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.svg", "*.ico", "*.woff", "*.woff2", "*.ttf", "*.eot", "*.mp4", "*.webm"]
   },
+  "routes": [
+    {
+      "route": "/donate",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/about",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/membership",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/membership/success",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/membership/renew",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/renew",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/events",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/contact",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/committee",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/projects",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/gallery",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/admin/login",
+      "rewrite": "/index.html"
+    },
+    {
+      "route": "/admin/gallery",
+      "rewrite": "/index.html"
+    }
+  ],
   "mimeTypes": {
     ".json": "application/json"
   }

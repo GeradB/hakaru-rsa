@@ -219,6 +219,7 @@ export default function HakaruRSAMembership() {
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
   const [membershipId, setMembershipId] = useState("");
+  const [errors, setErrors] = useState({});
   const [addressSearch, setAddressSearch] = useState("");
   const [addressResults, setAddressResults] = useState([]);
   const [addressLoading, setAddressLoading] = useState(false);
@@ -268,7 +269,12 @@ export default function HakaruRSAMembership() {
     donation: "",
   });
 
-  const set = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+  const set = (field, value) => {
+    setForm((f) => ({ ...f, [field]: value }));
+    if (errors[field]) {
+      setErrors((e) => ({ ...e, [field]: null }));
+    }
+  };
   const toggle = (field, value) =>
     setForm((f) => ({
       ...f,
@@ -276,6 +282,28 @@ export default function HakaruRSAMembership() {
         ? f[field].filter((v) => v !== value)
         : [...f[field], value],
     }));
+
+  const validateEmail = (email) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  };
+
+  const validateStep = (stepNum) => {
+    const newErrors = {};
+
+    if (stepNum === 0) {
+      if (!form.fullName?.trim()) newErrors.fullName = "Full name is required";
+      if (!form.email?.trim()) {
+        newErrors.email = "Email is required";
+      } else if (!validateEmail(form.email)) {
+        newErrors.email = "Please enter a valid email address";
+      }
+      if (!form.mailingAddress?.trim()) newErrors.mailingAddress = "Mailing address is required";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   // NZ Address lookup - proxied through backend to avoid CORS and rate limiting
   const searchAddress = useCallback(async (query) => {
@@ -355,10 +383,13 @@ export default function HakaruRSAMembership() {
   }, [debouncedSearch, searchAddress]);
 
   const isReturned = form.membershipType === "Returned & Service";
-  const fee = MEMBERSHIP_FEES[form.membershipType] || 0;
+  const baseFee = MEMBERSHIP_FEES[form.membershipType] || 0;
+  const fee = form.fullName2 ? baseFee * 2 : baseFee;
   const total = fee + (parseFloat(form.donation) || 0);
 
-  const progress = ((step + 1) / steps.length) * 100;
+  const displayStep = step > 2 && !isReturned ? step - 1 : step;
+  const displayTotal = isReturned ? steps.length : steps.length - 1;
+  const progress = ((displayStep + 1) / displayTotal) * 100;
 
   const stripeMetadata = useMemo(() => {
     return {
@@ -481,7 +512,10 @@ export default function HakaruRSAMembership() {
               </div>
               <div className="flex justify-between py-1 border-b border-green-200">
                 <span>Membership fee</span>
-                <span className="font-semibold">${fee.toFixed(2)}</span>
+                <span className="font-semibold">
+                  ${fee.toFixed(2)}
+                  {form.fullName2 && <span className="text-xs text-gray-500 ml-1">(×2 members)</span>}
+                </span>
               </div>
               {parseFloat(form.donation) > 0 && (
                 <div className="flex justify-between py-1 border-b border-green-200">
@@ -510,7 +544,7 @@ export default function HakaruRSAMembership() {
         <div className="text-center mb-8">
           <h1 className="text-3xl md:text-5xl font-bold font-heading text-white mb-4">Membership Application</h1>
           <p className="text-lg text-gray-300">
-            Step {step + 1} of {steps.length}: <span className="font-bold text-rsa-gold">{steps[step]}</span>
+            Step {displayStep + 1} of {displayTotal}: <span className="font-bold text-rsa-gold">{steps[step]}</span>
           </p>
         </div>
 
@@ -532,13 +566,14 @@ export default function HakaruRSAMembership() {
               <p className={sectionTitle}>Personal Details</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="md:col-span-2">
-                  <label className={labelClass}>Full Name (Applicant 1)</label>
+                  <label className={labelClass}>Full Name (Applicant 1) <span className="text-red-500">*</span></label>
                   <input
-                    className={inputClass}
+                    className={`${inputClass} ${errors.fullName ? "border-red-500 focus:border-red-500 focus:ring-red-200" : ""}`}
                     value={form.fullName}
                     onChange={(e) => set("fullName", e.target.value)}
                     placeholder="Full legal name"
                   />
+                  {errors.fullName && <p className="text-red-500 text-xs mt-1">{errors.fullName}</p>}
                 </div>
                 <div>
                   <label className={labelClass}>Date of Birth</label>
@@ -600,13 +635,14 @@ export default function HakaruRSAMembership() {
                   <p className="text-xs text-gray-500 mt-1">Search by street name, town, or postcode</p>
                 </div>
                 <div className="relative">
-                  <label className={labelClass}>Street Address</label>
+                  <label className={labelClass}>Street Address <span className="text-red-500">*</span></label>
                   <input
-                    className={inputClass}
+                    className={`${inputClass} ${errors.mailingAddress ? "border-red-500 focus:border-red-500 focus:ring-red-200" : ""}`}
                     value={form.mailingAddress}
                     onChange={(e) => set("mailingAddress", e.target.value)}
                     placeholder="Or enter manually"
                   />
+                  {errors.mailingAddress && <p className="text-red-500 text-xs mt-1">{errors.mailingAddress}</p>}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -671,14 +707,15 @@ export default function HakaruRSAMembership() {
                   <input className={inputClass} value={form.mobile} onChange={(e) => set("mobile", e.target.value)} placeholder="021 xxx xxxx" />
                 </div>
                 <div>
-                  <label className={labelClass}>Email</label>
+                  <label className={labelClass}>Email <span className="text-red-500">*</span></label>
                   <input
                     type="email"
-                    className={inputClass}
+                    className={`${inputClass} ${errors.email ? "border-red-500 focus:border-red-500 focus:ring-red-200" : ""}`}
                     value={form.email}
                     onChange={(e) => set("email", e.target.value)}
                     placeholder="email@example.com"
                   />
+                  {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
                 </div>
               </div>
             </div>
@@ -746,10 +783,6 @@ export default function HakaruRSAMembership() {
               <div className="space-y-1">
                 <YesNo field="consentEmail" label="I consent to be contacted via email for RSA related events." />
                 <YesNo field="consentAGM" label="I consent to be contacted via email for Hakaru & Districts RSA AGMs & EGMs." />
-                <YesNo
-                  field="consentWomens"
-                  label="I am female & consent to my contact details being passed to the Hakaru & Districts RSA Women's Section."
-                />
               </div>
             </div>
 
@@ -899,7 +932,10 @@ export default function HakaruRSAMembership() {
                 </div>
                 <div className="flex justify-between items-center p-4 border-b border-gray-100">
                   <span className="text-sm text-gray-600">Membership fee</span>
-                  <span className="font-bold text-rsa-navy">${fee.toFixed(2)}</span>
+                  <span className="font-bold text-rsa-navy">
+                    ${fee.toFixed(2)}
+                    {form.fullName2 && <span className="text-xs text-gray-500 ml-1">(×2 members)</span>}
+                  </span>
                 </div>
                 <div className="p-4 border-b border-gray-100">
                   <label className={labelClass}>Additional Donation (optional)</label>
@@ -947,7 +983,13 @@ export default function HakaruRSAMembership() {
           <div className="flex justify-between gap-4 mt-8 pt-6 border-t border-gray-200">
             <button
               type="button"
-              onClick={() => setStep((s) => Math.max(0, s - 1))}
+              onClick={() => {
+                if (step === 4 && !isReturned) {
+                  setStep(2);
+                } else {
+                  setStep((s) => Math.max(0, s - 1));
+                }
+              }}
               disabled={step === 0}
               className={`px-6 py-3 border-2 rounded-lg font-bold text-sm transition-all ${
                 step === 0
@@ -960,14 +1002,28 @@ export default function HakaruRSAMembership() {
             <button
               type="button"
               onClick={() => {
-                if (step < steps.length - 1) setStep((s) => s + 1);
-                else setSubmitted(true);
+                if (step === 0 && !validateStep(0)) return;
+                if (step === 2 && !isReturned) {
+                  setStep(4);
+                } else if (step < steps.length - 1) {
+                  setStep((s) => s + 1);
+                } else {
+                  setSubmitted(true);
+                }
               }}
               className={`px-8 py-3 rounded-lg font-bold text-sm transition-colors ${
-                step < steps.length - 1 ? "bg-rsa-gold text-rsa-navy hover:bg-yellow-400" : "bg-rsa-navy text-white hover:bg-opacity-90"
+                step === 2 && !isReturned
+                  ? "bg-rsa-navy text-white hover:bg-opacity-90"
+                  : step < steps.length - 1
+                  ? "bg-rsa-gold text-rsa-navy hover:bg-yellow-400"
+                  : "bg-rsa-navy text-white hover:bg-opacity-90"
               }`}
             >
-              {step < steps.length - 1 ? "Next →" : "Submit Application"}
+              {step === 2 && !isReturned
+                ? "Skip to Payment →"
+                : step < steps.length - 1
+                ? "Next →"
+                : "Submit Application"}
             </button>
           </div>
         ) : (

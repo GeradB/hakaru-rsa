@@ -85,9 +85,18 @@ export default function Contact() {
           </div>
         </div>
 
-        {/* Map Placeholder */}
-        <div className="mt-8 bg-white/10 rounded-2xl h-64 flex items-center justify-center">
-          <p className="text-white/80">Map integration can be added here</p>
+        {/* Map */}
+        <div className="mt-8 bg-white rounded-2xl shadow-2xl overflow-hidden">
+          <iframe
+            width="100%"
+            height="450"
+            style={{ border: 0 }}
+            loading="lazy"
+            allowFullScreen
+            referrerPolicy="no-referrer-when-downgrade"
+            src={`https://www.google.com/maps?q=${encodeURIComponent('733 Settlement Road, KAIWAKA 0573')}&output=embed`}
+            title="Hakaru RSA Location Map"
+          />
         </div>
       </div>
     </div>
