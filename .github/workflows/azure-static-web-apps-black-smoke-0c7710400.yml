@@ -15,27 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     name: Build and Deploy Job
     steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: true
-          lfs: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build with environment variables
-        run: npm run build
-        env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || secrets.VITE_API_BASE_URL }}
-          VITE_STRIPE_PUBLISHABLE_KEY: ${{ vars.VITE_STRIPE_PUBLISHABLE_KEY || secrets.VITE_STRIPE_PUBLISHABLE_KEY }}
-          VITE_CURRENCY: ${{ vars.VITE_CURRENCY || secrets.VITE_CURRENCY }}
-
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
@@ -46,7 +25,11 @@ jobs:
           app_location: "/"
           api_location: ""
           output_location: "dist"
-          skip_app_build: true
+          app_build_command: "npm install && npm run build"
+          env: |
+            VITE_API_BASE_URL=https://hakaru-api.azurewebsites.net
+            VITE_CURRENCY=NZD
+            VITE_STRIPE_PUBLISHABLE_KEY=pk_test_51TTsTdEOZAorwg9F0ekbKaByHTPCn1lVq9aVhBdRX4HnjRDccaNkzlyOv6Z4Zed4VX5b84ef9Iqw9xS0xOrF6qNI0071qXJ0BA
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
