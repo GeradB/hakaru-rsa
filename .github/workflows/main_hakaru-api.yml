@@ -1,6 +1,3 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-
 name: Build and deploy Node.js app to Azure Web App - hakaru-api
 
 on:
@@ -12,8 +9,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read #This is required for actions/checkout
 
     steps:
       - uses: actions/checkout@v4
@@ -21,45 +16,34 @@ jobs:
       - name: Set up Node.js version
         uses: actions/setup-node@v3
         with:
-          node-version: '24.x'
+          node-version: '20.x'
 
-      - name: npm install, build, and test
-        run: |
-          npm install
-          npm run build --if-present
-          npm run test --if-present
+      - name: Install dependencies (server folder)
+        working-directory: ./server
+        run: npm ci --only=production
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: .
+          path: ./server
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
-    permissions:
-      id-token: write #This is required for requesting the JWT
-      contents: read #This is required for actions/checkout
 
     steps:
       - name: Download artifact from build job
         uses: actions/download-artifact@v4
         with:
           name: node-app
-      
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_548EBFF64E734DE08FE9949B1F562007 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_A706D8B923B74D28A087935EC96788D9 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_25A1D3E8C6B94009B8BADF715B9B2E5D }}
 
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'hakaru-api'
+          app-name: 'hakaru-api-fyfrgkgmh9a3c7gt'
           slot-name: 'Production'
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: .
           
