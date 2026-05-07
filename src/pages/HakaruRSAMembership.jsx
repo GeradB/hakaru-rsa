@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
 
 const MEMBERSHIP_FEES = {
   "Returned & Service": 40,
@@ -22,9 +24,206 @@ const inputClass =
 const labelClass = "block text-sm font-bold text-rsa-navy mb-2";
 const sectionTitle = "text-xl font-bold font-heading text-rsa-navy mb-4";
 
+const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
+
+function StripePaymentInner({ amountNzd, currency, receiptEmail, metadata, onPaid }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState("");
+
+  const handlePay = async () => {
+    setPayError("");
+
+    if (!stripe || !elements) {
+      setPayError("Stripe has not finished loading yet. Please wait a moment and try again.");
+      return;
+    }
+
+    setPaying(true);
+
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        redirect: "if_required",
+      });
+
+      if (error) {
+        setPayError(error.message || "Payment failed.");
+        setPaying(false);
+        return;
+      }
+
+      if (!paymentIntent) {
+        setPayError("Unable to confirm payment. Please try again.");
+        setPaying(false);
+        return;
+      }
+
+      if (paymentIntent.status === "succeeded" || paymentIntent.status === "processing") {
+        onPaid?.(paymentIntent);
+        return;
+      }
+
+      setPayError(`Payment status: ${paymentIntent.status}`);
+      setPaying(false);
+    } catch (e) {
+      console.error(e);
+      setPayError("Payment failed. Please try again.");
+      setPaying(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <PaymentElement />
+
+      {payError ? (
+        <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg p-3">{payError}</div>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={handlePay}
+        disabled={!stripe || !elements || paying}
+        className="w-full bg-rsa-navy text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {paying ? "Processing..." : `Pay $${Number(amountNzd).toFixed(2)} ${currency}`}
+      </button>
+    </div>
+  );
+}
+
+function StripePaymentSection({ amountNzd, currency, receiptEmail, metadata, onPaid }) {
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+  const [clientSecret, setClientSecret] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const metadataPayload = useMemo(() => metadata || {}, [metadata]);
+
+  const elementsOptions = useMemo(() => {
+    if (!clientSecret) return null;
+
+    return {
+      clientSecret,
+      appearance: {
+        theme: "stripe",
+        variables: {
+          colorPrimary: "#0f172a",
+          borderRadius: "12px",
+        },
+      },
+    };
+  }, [clientSecret]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      setError("");
+      setClientSecret("");
+      setLoading(true);
+
+      try {
+        const resp = await fetch(`${apiUrl}/api/stripe/create-payment-intent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amountNzd,
+            currency,
+            receiptEmail,
+            metadata: metadataPayload,
+          }),
+        });
+
+        const json = await resp.json();
+
+        if (!resp.ok) {
+          throw new Error(json?.error || `Failed to create payment (${resp.status})`);
+        }
+
+        if (!json?.clientSecret) {
+          throw new Error("Missing client secret from server");
+        }
+
+        if (!cancelled) setClientSecret(json.clientSecret);
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) setError(e?.message || "Could not initialize Stripe payments.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    if (!stripePromise) return;
+
+    const amt = Number(amountNzd);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      setError("Amount must be greater than $0.00 to pay online.");
+      setLoading(false);
+      return;
+    }
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUrl, amountNzd, currency, receiptEmail, metadataPayload]);
+
+  if (!stripePublishableKey || !stripePromise) {
+    return (
+      <div className="border-2 border-dashed border-rsa-navy/30 bg-rsa-navy/5 p-6 rounded-lg">
+        <p className="text-sm font-bold text-rsa-navy">Stripe is not configured</p>
+        <p className="text-xs text-gray-600 mt-2">
+          Add <code className="bg-white px-1 rounded border border-gray-200">VITE_STRIPE_PUBLISHABLE_KEY</code> to your
+          frontend <code className="bg-white px-1 rounded border border-gray-200">.env</code> and restart Vite.
+        </p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="border-2 border-gray-200 bg-white rounded-lg p-6 text-center text-gray-600">
+        Initializing secure card payment...
+      </div>
+    );
+  }
+
+  if (error || !clientSecret) {
+    return (
+      <div className="border-2 border-red-200 bg-red-50 rounded-lg p-4 text-sm text-red-800">
+        <p className="font-bold">Could not load Stripe Payment Element</p>
+        <p className="mt-2">{error || "Missing PaymentIntent client secret."}</p>
+        <p className="mt-3 text-xs text-red-900">
+          Make sure your backend is running with{" "}
+          <code className="bg-white px-1 rounded border border-red-200">STRIPE_SECRET_KEY</code> set and CORS allows{" "}
+          <code className="bg-white px-1 rounded border border-red-200">{window.location.origin}</code>.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <Elements stripe={stripePromise} options={elementsOptions}>
+      <StripePaymentInner amountNzd={amountNzd} currency={currency} receiptEmail={receiptEmail} metadata={metadataPayload} onPaid={onPaid} />
+    </Elements>
+  );
+}
+
 export default function HakaruRSAMembership() {
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [membershipId, setMembershipId] = useState("");
+  const [addressSearch, setAddressSearch] = useState("");
+  const [addressResults, setAddressResults] = useState([]);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [showAddressResults, setShowAddressResults] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [form, setForm] = useState({
     // Personal
     fullName: "",
@@ -78,11 +277,134 @@ export default function HakaruRSAMembership() {
         : [...f[field], value],
     }));
 
+  // NZ Address lookup - proxied through backend to avoid CORS and rate limiting
+  const searchAddress = useCallback(async (query) => {
+    if (query.length < 3) {
+      setAddressResults([]);
+      setShowAddressResults(false);
+      return;
+    }
+
+    setAddressLoading(true);
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001";
+      const response = await fetch(`${apiUrl}/api/address/lookup?q=${encodeURIComponent(query)}`);
+      const data = await response.json();
+
+      if (Array.isArray(data)) {
+        setAddressResults(
+          data.map((item) => ({
+            id: item.place_id,
+            fullAddress: item.display_name,
+            street:
+              item.address?.road ||
+              item.address?.pedestrian ||
+              item.address?.street ||
+              "",
+            town: item.address?.town || item.address?.city || item.address?.suburb || "",
+            postcode: item.address?.postcode || "",
+          }))
+        );
+        setShowAddressResults(true);
+      }
+    } catch (error) {
+      console.error("Address lookup failed:", error);
+      setAddressResults([]);
+    } finally {
+      setAddressLoading(false);
+    }
+  }, []);
+
+  const selectAddress = (address) => {
+    set("mailingAddress", address.street);
+    set("mailingTown", address.town);
+    set("mailingPostCode", address.postcode);
+    setAddressSearch(address.fullAddress);
+    setAddressResults([]);
+    setShowAddressResults(false);
+  };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest(".address-search-container")) {
+        setShowAddressResults(false);
+      }
+    };
+    if (showAddressResults) {
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
+    }
+  }, [showAddressResults]);
+
+  // Debounce address search to avoid rate limiting
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(addressSearch);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [addressSearch]);
+
+  useEffect(() => {
+    if (debouncedSearch) {
+      searchAddress(debouncedSearch);
+    } else {
+      setAddressResults([]);
+      setShowAddressResults(false);
+    }
+  }, [debouncedSearch, searchAddress]);
+
   const isReturned = form.membershipType === "Returned & Service";
   const fee = MEMBERSHIP_FEES[form.membershipType] || 0;
   const total = fee + (parseFloat(form.donation) || 0);
 
   const progress = ((step + 1) / steps.length) * 100;
+
+  const stripeMetadata = useMemo(() => {
+    return {
+      flow: "membership_application",
+      membership_type: form.membershipType || "",
+      applicant_email: form.email || "",
+    };
+  }, [form.membershipType, form.email]);
+
+  const handleStripePaid = useCallback(async (paymentIntent) => {
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+    try {
+      // Submit full form data to database
+      const response = await fetch(`${apiUrl}/api/membership/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ formData: form }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setMembershipId(data.membershipId);
+
+        // Update payment information and write all form fields to database
+        await fetch(`${apiUrl}/api/membership/update-payment`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            membershipId: data.membershipId,
+            paymentIntentId: paymentIntent.id,
+            status: paymentIntent.status,
+            amount: total,
+            formData: form,
+          }),
+        });
+      }
+
+      setSubmitted(true);
+    } catch (error) {
+      console.error("Error submitting membership:", error);
+      // Still mark as submitted even if DB save fails
+      setSubmitted(true);
+    }
+  }, [form, total]);
 
   const YesNo = ({ field, label }) => (
     <div className="flex items-start gap-4 py-3 border-b border-gray-200">
@@ -126,7 +448,7 @@ export default function HakaruRSAMembership() {
 
   if (submitted) {
     return (
-      <div className="bg-gradient-to-b from-rsa-navy via-slate-800 to-rsa-navy min-h-screen py-16">
+      <div className="bg-gradient-to-b from-rsa-navy via-slate-800 to-rsa-navy py-16">
         <div className="max-w-2xl mx-auto px-4">
           <div className="bg-white rounded-2xl shadow-2xl p-8 text-center">
             <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -139,9 +461,17 @@ export default function HakaruRSAMembership() {
             <p className="text-gray-600 mb-2">
               Thank you, <strong>{form.fullName}</strong>.
             </p>
+            <p className="text-gray-600 mb-2">
+              Your Hakaru &amp; Districts RSA membership application has been received.
+            </p>
+            {membershipId && (
+              <div className="bg-rsa-navy/5 border border-rsa-navy/20 rounded-lg p-3 mb-6">
+                <p className="text-sm font-bold text-rsa-navy">Membership Reference</p>
+                <p className="text-lg font-mono text-rsa-navy">{membershipId}</p>
+              </div>
+            )}
             <p className="text-gray-600 mb-6">
-              Your Hakaru &amp; Districts RSA membership application has been received. A confirmation email will be sent to{" "}
-              <strong>{form.email}</strong>.
+              A confirmation email will be sent to <strong>{form.email}</strong>.
             </p>
 
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-left text-sm text-green-900 mb-6">
@@ -175,7 +505,7 @@ export default function HakaruRSAMembership() {
   }
 
   return (
-    <div className="bg-gradient-to-b from-rsa-navy via-slate-800 to-rsa-navy min-h-screen py-16">
+    <div className="bg-gradient-to-b from-rsa-navy via-slate-800 to-rsa-navy py-16">
       <div className="max-w-4xl mx-auto px-4">
         <div className="text-center mb-8">
           <h1 className="text-3xl md:text-5xl font-bold font-heading text-white mb-4">Membership Application</h1>
@@ -235,13 +565,47 @@ export default function HakaruRSAMembership() {
             <div>
               <p className={sectionTitle}>Mailing Address</p>
               <div className="space-y-4">
-                <div>
+                <div className="address-search-container">
+                  <label className={labelClass}>Search Address</label>
+                  <div className="relative">
+                    <input
+                      className={inputClass}
+                      value={addressSearch}
+                      onChange={(e) => {
+                        setAddressSearch(e.target.value);
+                      }}
+                      onFocus={() => addressResults.length > 0 && setShowAddressResults(true)}
+                      placeholder="Start typing address to search..."
+                    />
+                    {addressLoading && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="w-5 h-5 border-2 border-rsa-navy border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                    {showAddressResults && addressResults.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border-2 border-rsa-navy/30 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {addressResults.map((addr) => (
+                          <button
+                            key={addr.id}
+                            type="button"
+                            onClick={() => selectAddress(addr)}
+                            className="w-full px-4 py-3 text-left text-sm hover:bg-rsa-gold/10 border-b border-gray-100 last:border-0 transition-colors"
+                          >
+                            <div className="font-bold text-rsa-navy">{addr.fullAddress}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Search by street name, town, or postcode</p>
+                </div>
+                <div className="relative">
                   <label className={labelClass}>Street Address</label>
                   <input
                     className={inputClass}
                     value={form.mailingAddress}
                     onChange={(e) => set("mailingAddress", e.target.value)}
-                    placeholder="Street address"
+                    placeholder="Or enter manually"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -562,19 +926,14 @@ export default function HakaruRSAMembership() {
 
             <div>
               <p className={sectionTitle}>Card Payment</p>
-              <div className="border-2 border-dashed border-rsa-navy/30 bg-rsa-navy/5 p-6 text-center rounded-lg">
-                <div className="text-rsa-navy mb-2">
-                  <svg className="w-8 h-8 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                  </svg>
-                </div>
-                <p className="text-sm font-bold text-rsa-navy">Stripe Payment Element</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Connect your Stripe publishable key to enable card payments here.
-                  <br />
-                  Install:{" "}
-                  <code className="bg-white px-1 rounded border border-gray-200">npm install @stripe/react-stripe-js @stripe/stripe-js</code>
-                </p>
+              <div className="border-2 border-gray-200 bg-white rounded-lg p-6">
+                <StripePaymentSection
+                  amountNzd={total}
+                  currency={import.meta.env.VITE_CURRENCY || "NZD"}
+                  receiptEmail={form.email}
+                  metadata={stripeMetadata}
+                  onPaid={handleStripePaid}
+                />
               </div>
             </div>
 
@@ -584,32 +943,47 @@ export default function HakaruRSAMembership() {
           </div>
         )}
 
-        <div className="flex justify-between gap-4 mt-8 pt-6 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={() => setStep((s) => Math.max(0, s - 1))}
-            disabled={step === 0}
-            className={`px-6 py-3 border-2 rounded-lg font-bold text-sm transition-all ${
-              step === 0
-                ? "opacity-40 cursor-not-allowed border-gray-200 text-gray-400"
-                : "border-rsa-navy text-rsa-navy hover:bg-rsa-navy hover:text-white"
-            }`}
-          >
-            ← Back
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (step < steps.length - 1) setStep((s) => s + 1);
-              else setSubmitted(true);
-            }}
-            className={`px-8 py-3 rounded-lg font-bold text-sm transition-colors ${
-              step < steps.length - 1 ? "bg-rsa-gold text-rsa-navy hover:bg-yellow-400" : "bg-rsa-navy text-white hover:bg-opacity-90"
-            }`}
-          >
-            {step < steps.length - 1 ? "Next →" : "Submit Application"}
-          </button>
-        </div>
+        {step !== 4 ? (
+          <div className="flex justify-between gap-4 mt-8 pt-6 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={() => setStep((s) => Math.max(0, s - 1))}
+              disabled={step === 0}
+              className={`px-6 py-3 border-2 rounded-lg font-bold text-sm transition-all ${
+                step === 0
+                  ? "opacity-40 cursor-not-allowed border-gray-200 text-gray-400"
+                  : "border-rsa-navy text-rsa-navy hover:bg-rsa-navy hover:text-white"
+              }`}
+            >
+              ← Back
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (step < steps.length - 1) setStep((s) => s + 1);
+                else setSubmitted(true);
+              }}
+              className={`px-8 py-3 rounded-lg font-bold text-sm transition-colors ${
+                step < steps.length - 1 ? "bg-rsa-gold text-rsa-navy hover:bg-yellow-400" : "bg-rsa-navy text-white hover:bg-opacity-90"
+              }`}
+            >
+              {step < steps.length - 1 ? "Next →" : "Submit Application"}
+            </button>
+          </div>
+        ) : (
+          <div className="flex justify-between gap-4 mt-8 pt-6 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={() => setStep((s) => Math.max(0, s - 1))}
+              className="px-6 py-3 border-2 rounded-lg font-bold text-sm transition-all border-rsa-navy text-rsa-navy hover:bg-rsa-navy hover:text-white"
+            >
+              ← Back
+            </button>
+            <div className="text-xs text-gray-500 max-w-md text-right leading-snug">
+              Payment is completed using the <span className="font-bold text-rsa-navy">Pay</span> button above.
+            </div>
+          </div>
+        )}
         </div>
 
         <div className="text-center text-xs text-gray-400 mt-6">

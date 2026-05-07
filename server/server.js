@@ -1,0 +1,954 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import axios from 'axios';
+import nodemailer from 'nodemailer';
+import crypto from 'crypto';
+import cookieParser from 'cookie-parser';
+import multer from 'multer';
+import bcrypt from 'bcryptjs';
+import Stripe from 'stripe';
+import {
+  createMembership,
+  updateMembership,
+  getMembership,
+  listPublishedGalleryItems,
+  listAllGalleryItems,
+  getGalleryItemById,
+  createGalleryItem,
+  updateGalleryItem,
+  deleteGalleryItem,
+  createRenewal,
+  updateRenewal,
+  createDonation,
+  updateDonation,
+  listPublishedAlbums,
+  listAllAlbums,
+  createAlbum,
+  updateAlbum,
+  deleteAlbum,
+} from './db.js';
+import { uploadGalleryImage, deleteGalleryBlob, isAzureGalleryConfigured } from './galleryBlob.js';
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
+
+const resolveAllowedOrigins = () => {
+  const raw = process.env.FRONTEND_URLS || process.env.FRONTEND_URL || '';
+  const urls = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  return urls.length ? urls : ['http://localhost:5173'];
+};
+
+// Middleware
+app.use(cors({
+  origin: (origin, callback) => {
+    const allowed = resolveAllowedOrigins();
+
+    // Allow non-browser clients / Postman
+    if (!origin) return callback(null, true);
+
+    if (allowed.includes(origin)) return callback(null, true);
+
+    return callback(new Error(`Not allowed by CORS: ${origin}`));
+  },
+  credentials: true
+}));
+app.use(express.json());
+app.use(cookieParser());
+
+// In-memory store for pending memberships (fallback if DB not configured)
+const pendingMemberships = new Map();
+const dbConfigured = !!(process.env.SQL_SERVER_HOST || process.env.SQL_SERVER_DATABASE);
+
+// --- Gallery & admin auth ---
+const MAX_GALLERY_UPLOAD_BYTES = 10 * 1024 * 1024;
+const ADMIN_SESSION_MS = 8 * 60 * 60 * 1000;
+const adminSessions = new Map(); // token -> expiresAt (epoch ms)
+const loginAttemptsByIp = new Map();
+
+const mapGalleryRow = (row) => ({
+  id: row.id,
+  title: row.title,
+  caption: row.caption,
+  blobName: row.blob_name,
+  publicUrl: row.public_url,
+  sortOrder: row.sort_order,
+  isPublished: !!row.is_published,
+  albumId: row.album_id,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const detectImageType = (buffer) => {
+  if (!buffer || buffer.length < 12) return null;
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return { ext: 'jpg', mime: 'image/jpeg' };
+  }
+  if (
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47
+  ) {
+    return { ext: 'png', mime: 'image/png' };
+  }
+  const riff = buffer.toString('ascii', 0, 4);
+  const webp = buffer.toString('ascii', 8, 12);
+  if (riff === 'RIFF' && webp === 'WEBP') {
+    return { ext: 'webp', mime: 'image/webp' };
+  }
+  return null;
+};
+
+const adminAuthConfigured = () =>
+  !!(process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD_HASH);
+
+const getClientIp = (req) =>
+  req.ip ||
+  req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+  req.socket?.remoteAddress ||
+  'unknown';
+
+const checkLoginRateLimit = (ip) => {
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000;
+  const maxAttempts = 20;
+  let entry = loginAttemptsByIp.get(ip);
+  if (!entry || now > entry.resetAt) {
+    entry = { count: 0, resetAt: now + windowMs };
+    loginAttemptsByIp.set(ip, entry);
+  }
+  entry.count += 1;
+  if (entry.count > maxAttempts) {
+    return false;
+  }
+  return true;
+};
+
+const requireAdmin = (req, res, next) => {
+  if (!adminAuthConfigured()) {
+    return res.status(503).json({ error: 'Admin authentication is not configured' });
+  }
+  const token = req.cookies?.admin_session;
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const expiresAt = adminSessions.get(token);
+  if (!expiresAt || Date.now() > expiresAt) {
+    adminSessions.delete(token);
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+};
+
+const adminSessionCookieOptions = () => ({
+  httpOnly: true,
+  path: '/',
+  maxAge: ADMIN_SESSION_MS,
+  sameSite: 'lax',
+  secure: process.env.NODE_ENV === 'production' || process.env.COOKIE_SECURE === 'true',
+});
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_GALLERY_UPLOAD_BYTES },
+});
+
+// Email transporter setup
+const createTransporter = () => {
+  return nodemailer.createTransport({
+    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.EMAIL_PORT) || 587,
+    secure: false,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD,
+    },
+  });
+};
+
+// Generate unique transaction reference
+const generateTxnRef = () => {
+  return `MEM-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+};
+
+const nzdToMinorUnits = (amountNzd) => {
+  return Math.round(Number(amountNzd) * 100);
+};
+
+// POST /api/stripe/create-payment-intent
+// Creates a Stripe PaymentIntent for Stripe Elements / Payment Element
+app.post('/api/stripe/create-payment-intent', async (req, res) => {
+  try {
+    if (!stripe) {
+      return res.status(501).json({ error: 'Stripe is not configured (missing STRIPE_SECRET_KEY)' });
+    }
+
+    const { amountNzd, currency, receiptEmail, metadata } = req.body || {};
+
+    const minorAmount = nzdToMinorUnits(amountNzd);
+    const currencyLower = (currency || process.env.CURRENCY || 'NZD').toLowerCase();
+
+    if (!Number.isFinite(minorAmount) || minorAmount <= 0) {
+      return res.status(400).json({ error: 'Invalid amount' });
+    }
+
+    // Validate email if provided
+    if (receiptEmail) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(receiptEmail)) {
+        return res.status(400).json({ error: 'Invalid email address' });
+      }
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: minorAmount,
+      currency: currencyLower,
+      receipt_email: receiptEmail || undefined,
+      automatic_payment_methods: { enabled: true },
+      metadata: metadata && typeof metadata === 'object' ? metadata : {},
+    });
+
+    res.json({
+      success: true,
+      clientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+    });
+  } catch (error) {
+    console.error('Error creating Stripe PaymentIntent:', error);
+    res.status(500).json({ error: 'Failed to create Stripe PaymentIntent' });
+  }
+});
+
+
+// Send confirmation email to member
+const sendConfirmationEmail = async (data, txnRef) => {
+  try {
+    const transporter = createTransporter();
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #1a365d;">Membership Confirmation - Hakaru & Districts RSA</h2>
+
+        <p>Dear ${data.fullName},</p>
+
+        <p>Thank you for your membership application to Hakaru & Districts RSA.</p>
+
+        <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #2d3748; margin-top: 0;">Application Details</h3>
+          <p><strong>Name:</strong> ${data.fullName}</p>
+          <p><strong>Email:</strong> ${data.email}</p>
+          <p><strong>Phone:</strong> ${data.phone}</p>
+          <p><strong>Address:</strong> ${data.address}</p>
+          <p><strong>Date:</strong> ${data.date}</p>
+        </div>
+
+        <div style="background: #f0fff4; padding: 15px; border-radius: 8px; border-left: 4px solid #48bb78;">
+          <p><strong>Payment Status:</strong> Paid</p>
+          <p><strong>Amount:</strong> $${data.amount.toFixed(2)} ${data.currency}</p>
+          <p><strong>Transaction Reference:</strong> ${txnRef}</p>
+        </div>
+
+        <p>Your provisional membership is now active. You will receive your membership card shortly.</p>
+
+        <p style="color: #718096; font-size: 14px; margin-top: 30px;">
+          If you have any questions, please contact us at admin@hakaru-rsa.org.nz
+        </p>
+
+        <p>Kind regards,<br>Hakaru & Districts RSA</p>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: data.email,
+      subject: 'Membership Confirmation - Hakaru RSA',
+      html: htmlContent,
+    });
+
+    console.log(`Confirmation email sent to ${data.email}`);
+  } catch (error) {
+    console.error('Error sending confirmation email:', error);
+  }
+};
+
+// Send admin notification email
+const sendAdminNotification = async (data, txnRef) => {
+  try {
+    const transporter = createTransporter();
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #1a365d;">New Membership Application</h2>
+
+        <p>A new membership application has been received and paid.</p>
+
+        <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <h3 style="color: #2d3748; margin-top: 0;">Member Details</h3>
+          <p><strong>Name:</strong> ${data.fullName}</p>
+          <p><strong>Email:</strong> ${data.email}</p>
+          <p><strong>Phone:</strong> ${data.phone}</p>
+          <p><strong>Address:</strong> ${data.address}</p>
+          <p><strong>Application Date:</strong> ${data.date}</p>
+        </div>
+
+        <div style="background: #f0fff4; padding: 15px; border-radius: 8px; border-left: 4px solid #48bb78;">
+          <p><strong>Payment:</strong> $${data.amount.toFixed(2)} ${data.currency}</p>
+          <p><strong>Transaction Reference:</strong> ${txnRef}</p>
+          <p><strong>Paid At:</strong> ${data.paidAt}</p>
+        </div>
+
+        <p style="color: #718096; font-size: 14px; margin-top: 30px;">
+          Please process this membership application and issue the membership card.
+        </p>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to: process.env.EMAIL_TO,
+      subject: `New Membership: ${data.fullName}`,
+      html: htmlContent,
+    });
+
+    console.log(`Admin notification sent for ${data.email}`);
+  } catch (error) {
+    console.error('Error sending admin notification:', error);
+  }
+};
+
+// GET /api/membership/status/:txnRef
+// Check payment status
+app.get('/api/membership/status/:txnRef', (req, res) => {
+  const { txnRef } = req.params;
+  const membershipData = pendingMemberships.get(txnRef);
+
+  if (!membershipData) {
+    return res.status(404).json({ error: 'Membership not found' });
+  }
+
+  res.json({
+    success: true,
+    status: membershipData.status,
+    paidAt: membershipData.paidAt,
+  });
+});
+
+// POST /api/membership/submit
+// Submit membership application to database
+app.post('/api/membership/submit', async (req, res) => {
+  try {
+    const { formData } = req.body;
+
+    if (!formData || !formData.email || !formData.fullName) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Use database if configured, otherwise fall back to in-memory
+    if (dbConfigured) {
+      const membershipId = await createMembership(formData);
+
+      console.log(`Membership created in database: ${membershipId} for ${formData.email}`);
+
+      res.json({
+        success: true,
+        membershipId,
+        message: 'Membership application submitted',
+      });
+    } else {
+      // Fallback to in-memory storage
+      const txnRef = generateTxnRef();
+      pendingMemberships.set(txnRef, {
+        ...formData,
+        createdAt: new Date().toISOString(),
+        status: 'pending',
+      });
+
+      console.log(`Membership created in-memory: ${txnRef} for ${formData.email}`);
+
+      res.json({
+        success: true,
+        membershipId: txnRef,
+        message: 'Membership application submitted (in-memory)',
+      });
+    }
+  } catch (error) {
+    console.error('Error creating membership:', error);
+    res.status(500).json({ error: 'Failed to create membership application' });
+  }
+});
+
+// POST /api/membership/update-payment
+// Update membership with payment information and all form data
+app.post('/api/membership/update-payment', async (req, res) => {
+  try {
+    const { membershipId, paymentIntentId, status, amount, formData } = req.body;
+
+    if (!membershipId) {
+      return res.status(400).json({ error: 'Missing membershipId' });
+    }
+
+    const paymentData = {
+      stripePaymentIntentId: paymentIntentId,
+      paymentStatus: status,
+      amountPaid: amount,
+      paidAt: status === 'succeeded' ? new Date().toISOString() : null,
+      status: status === 'succeeded' ? 'paid' : status,
+    };
+
+    if (dbConfigured) {
+      await updateMembership(membershipId, formData || {}, paymentData);
+      console.log(`Membership ${membershipId} updated with payment: ${status}`);
+    } else {
+      // Fallback: find and update in-memory record
+      for (const [key, value] of pendingMemberships.entries()) {
+        if (key === membershipId || value.stripePaymentIntentId === paymentIntentId) {
+          pendingMemberships.set(key, { ...value, ...formData, ...paymentData });
+          break;
+        }
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating payment:', error);
+    res.status(500).json({ error: 'Failed to update payment information' });
+  }
+});
+
+// GET /api/membership/:id
+// Get membership details by ID
+app.get('/api/membership/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (dbConfigured) {
+      const membership = await getMembership(id);
+
+      if (!membership) {
+        return res.status(404).json({ error: 'Membership not found' });
+      }
+
+      res.json({ success: true, membership });
+    } else {
+      const membershipData = pendingMemberships.get(id);
+
+      if (!membershipData) {
+        return res.status(404).json({ error: 'Membership not found' });
+      }
+
+      res.json({ success: true, membership: membershipData });
+    }
+  } catch (error) {
+    console.error('Error fetching membership:', error);
+    res.status(500).json({ error: 'Failed to fetch membership' });
+  }
+});
+
+// POST /api/renewal/submit
+// Submit membership renewal to database
+app.post('/api/renewal/submit', async (req, res) => {
+  try {
+    const { formData, fee, donation, total } = req.body;
+
+    if (!formData || !formData.email || !formData.fullName) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    if (dbConfigured) {
+      const renewalId = await createRenewal({ ...formData, fee, donation, total });
+
+      console.log(`Renewal created in database: ${renewalId} for ${formData.email}`);
+
+      res.json({
+        success: true,
+        renewalId,
+        message: 'Membership renewal submitted',
+      });
+    } else {
+      return res.status(503).json({ error: 'Database is not configured' });
+    }
+  } catch (error) {
+    console.error('Error creating renewal:', error);
+    res.status(500).json({ error: 'Failed to create membership renewal' });
+  }
+});
+
+// POST /api/renewal/update-payment
+// Update renewal with payment information and all form data
+app.post('/api/renewal/update-payment', async (req, res) => {
+  try {
+    const { renewalId, paymentIntentId, status, amount, formData, fee, donation } = req.body;
+
+    if (!renewalId) {
+      return res.status(400).json({ error: 'Missing renewalId' });
+    }
+
+    const paymentData = {
+      stripePaymentIntentId: paymentIntentId,
+      paymentStatus: status,
+      amountPaid: amount,
+      fee,
+      total: donation ? (fee || 0) + (parseFloat(donation) || 0) : (fee || 0),
+      paidAt: status === 'succeeded' ? new Date().toISOString() : null,
+      status: status === 'succeeded' ? 'paid' : status,
+    };
+
+    if (dbConfigured) {
+      await updateRenewal(renewalId, formData || {}, paymentData);
+      console.log(`Renewal ${renewalId} updated with payment: ${status}`);
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating payment:', error);
+    res.status(500).json({ error: 'Failed to update payment information' });
+  }
+});
+
+// POST /api/donation/submit
+// Submit donation to database
+app.post('/api/donation/submit', async (req, res) => {
+  try {
+    const { formData } = req.body;
+
+    if (!formData || !formData.email) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    if (dbConfigured) {
+      const donationId = await createDonation(formData);
+
+      console.log(`Donation created in database: ${donationId} for ${formData.email}`);
+
+      res.json({
+        success: true,
+        donationId,
+        message: 'Donation submitted',
+      });
+    } else {
+      return res.status(503).json({ error: 'Database is not configured' });
+    }
+  } catch (error) {
+    console.error('Error creating donation:', error);
+    res.status(500).json({ error: 'Failed to create donation' });
+  }
+});
+
+// POST /api/donation/update-payment
+// Update donation with payment information and all form data
+app.post('/api/donation/update-payment', async (req, res) => {
+  try {
+    const { donationId, paymentIntentId, status, amount, formData } = req.body;
+
+    if (!donationId) {
+      return res.status(400).json({ error: 'Missing donationId' });
+    }
+
+    const paymentData = {
+      stripePaymentIntentId: paymentIntentId,
+      paymentStatus: status,
+      amountPaid: amount,
+      paidAt: status === 'succeeded' ? new Date().toISOString() : null,
+      status: status === 'succeeded' ? 'paid' : status,
+    };
+
+    if (dbConfigured) {
+      await updateDonation(donationId, formData || {}, paymentData);
+      console.log(`Donation ${donationId} updated with payment: ${status}`);
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating payment:', error);
+    res.status(500).json({ error: 'Failed to update payment information' });
+  }
+});
+
+// GET /api/gallery — published images for public site
+app.get('/api/gallery', async (_req, res) => {
+  if (!dbConfigured) {
+    return res.json({ items: [] });
+  }
+  try {
+    const rows = await listPublishedGalleryItems();
+    res.json({ items: rows.map(mapGalleryRow) });
+  } catch (error) {
+    console.error('Error listing gallery:', error);
+    res.json({ items: [] });
+  }
+});
+
+// POST /api/admin/login
+app.post('/api/admin/login', async (req, res) => {
+  try {
+    if (!adminAuthConfigured()) {
+      return res.status(503).json({ error: 'Admin authentication is not configured' });
+    }
+    const ip = getClientIp(req);
+    if (!checkLoginRateLimit(ip)) {
+      return res.status(429).json({ error: 'Too many login attempts' });
+    }
+
+    const { username, password } = req.body || {};
+    const expectedUser = process.env.ADMIN_USERNAME;
+    const hash = process.env.ADMIN_PASSWORD_HASH;
+    if (
+      !username ||
+      !password ||
+      username !== expectedUser ||
+      !bcrypt.compareSync(password, hash)
+    ) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    adminSessions.set(token, Date.now() + ADMIN_SESSION_MS);
+    res.cookie('admin_session', token, adminSessionCookieOptions());
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// POST /api/admin/logout
+app.post('/api/admin/logout', (req, res) => {
+  const token = req.cookies?.admin_session;
+  if (token) adminSessions.delete(token);
+  res.clearCookie('admin_session', { path: '/' });
+  res.json({ success: true });
+});
+
+// GET /api/admin/gallery — all items (draft + published)
+app.get('/api/admin/gallery', requireAdmin, async (_req, res) => {
+  if (!dbConfigured) {
+    return res.status(503).json({ error: 'Database is not configured' });
+  }
+  try {
+    const rows = await listAllGalleryItems();
+    res.json({ items: rows.map(mapGalleryRow) });
+  } catch (error) {
+    console.error('Error listing admin gallery:', error);
+    res.status(500).json({ error: 'Failed to list gallery items' });
+  }
+});
+
+// POST /api/admin/gallery/upload
+app.post(
+  '/api/admin/gallery/upload',
+  requireAdmin,
+  upload.array('images', 20),
+  async (req, res) => {
+    if (!dbConfigured) {
+      return res.status(503).json({ error: 'Database is not configured' });
+    }
+    if (!isAzureGalleryConfigured()) {
+      return res.status(503).json({ error: 'Azure Blob Storage is not configured' });
+    }
+
+    const files = req.files;
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: 'Missing image files (field name: images)' });
+    }
+
+    const uploaded = [];
+    const errors = [];
+
+    for (const file of files) {
+      const kind = detectImageType(file.buffer);
+      if (!kind) {
+        errors.push({ filename: file.originalname, error: 'Invalid format (JPEG, PNG, WebP only)' });
+        continue;
+      }
+
+      const now = new Date();
+      const y = now.getUTCFullYear();
+      const m = String(now.getUTCMonth() + 1).padStart(2, '0');
+      const blobName = `${y}/${m}/${crypto.randomUUID()}.${kind.ext}`;
+      let publicUrl;
+
+      try {
+        publicUrl = await uploadGalleryImage(file.buffer, blobName, kind.mime);
+      } catch (error) {
+        console.error('Azure upload failed:', error);
+        errors.push({ filename: file.originalname, error: 'Upload failed' });
+        continue;
+      }
+
+      try {
+        const id = await createGalleryItem({
+          title: null,
+          caption: null,
+          blobName,
+          publicUrl,
+          sortOrder: null,
+          isPublished: false,
+          albumId: req.body?.albumId || null,
+        });
+        if (!id) {
+          await deleteGalleryBlob(blobName).catch(() => {});
+          errors.push({ filename: file.originalname, error: 'DB insert failed' });
+          continue;
+        }
+        uploaded.push({ id, publicUrl, blobName });
+      } catch (error) {
+        console.error('Gallery DB insert failed:', error);
+        await deleteGalleryBlob(blobName).catch(() => {});
+        errors.push({ filename: file.originalname, error: 'DB insert failed' });
+      }
+    }
+
+    if (uploaded.length === 0) {
+      return res.status(500).json({ error: 'All uploads failed', errors });
+    }
+
+    res.status(201).json({
+      success: true,
+      count: uploaded.length,
+      uploaded,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+  },
+);
+
+// PUT /api/admin/gallery/:id
+app.put('/api/admin/gallery/:id', requireAdmin, async (req, res) => {
+  if (!dbConfigured) {
+    return res.status(503).json({ error: 'Database is not configured' });
+  }
+  const { id } = req.params;
+  const { title, caption, sortOrder, isPublished } = req.body || {};
+
+  try {
+    const existing = await getGalleryItemById(id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Gallery item not found' });
+    }
+
+    let nextOrder = existing.sort_order;
+    if (sortOrder !== undefined && sortOrder !== null) {
+      const n = Number(sortOrder);
+      if (!Number.isInteger(n) || n < 0) {
+        return res.status(400).json({ error: 'sortOrder must be a non-negative integer' });
+      }
+      nextOrder = n;
+    }
+
+    await updateGalleryItem(id, {
+      title: title !== undefined ? title : existing.title,
+      caption: caption !== undefined ? caption : existing.caption,
+      sortOrder: nextOrder,
+      isPublished: isPublished !== undefined ? !!isPublished : !!existing.is_published,
+      albumId: req.body?.albumId !== undefined ? req.body.albumId : existing.album_id,
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Gallery update failed:', error);
+    res.status(500).json({ error: 'Failed to update gallery item' });
+  }
+});
+
+// DELETE /api/admin/gallery/:id
+app.delete('/api/admin/gallery/:id', requireAdmin, async (req, res) => {
+  if (!dbConfigured) {
+    return res.status(503).json({ error: 'Database is not configured' });
+  }
+  const { id } = req.params;
+  try {
+    const blobName = await deleteGalleryItem(id);
+    if (!blobName) {
+      return res.status(404).json({ error: 'Gallery item not found' });
+    }
+    if (isAzureGalleryConfigured()) {
+      await deleteGalleryBlob(blobName);
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Gallery delete failed:', error);
+    res.status(500).json({ error: 'Failed to delete gallery item' });
+  }
+});
+
+// --- Album endpoints ---
+
+// GET /api/admin/albums — all albums
+app.get('/api/admin/albums', requireAdmin, async (_req, res) => {
+  if (!dbConfigured) {
+    return res.status(503).json({ error: 'Database is not configured' });
+  }
+  try {
+    const albums = await listAllAlbums();
+    res.json({ albums: albums.map(a => ({ ...a, id: a.id.toString ? a.id.toString() : a.id })) });
+  } catch (error) {
+    console.error('Error listing albums:', error);
+    res.status(500).json({ error: 'Failed to list albums' });
+  }
+});
+
+// POST /api/admin/albums — create album
+app.post('/api/admin/albums', requireAdmin, async (req, res) => {
+  if (!dbConfigured) {
+    return res.status(503).json({ error: 'Database is not configured' });
+  }
+  try {
+    const { name, description, sortOrder, isPublished } = req.body || {};
+    if (!name) {
+      return res.status(400).json({ error: 'Album name is required' });
+    }
+    const id = await createAlbum({ name, description, sortOrder, isPublished });
+    res.status(201).json({ success: true, id: id.toString ? id.toString() : id });
+  } catch (error) {
+    console.error('Create album failed:', error);
+    res.status(500).json({ error: 'Failed to create album' });
+  }
+});
+
+// PUT /api/admin/albums/:id — update album
+app.put('/api/admin/albums/:id', requireAdmin, async (req, res) => {
+  if (!dbConfigured) {
+    return res.status(503).json({ error: 'Database is not configured' });
+  }
+  const { id } = req.params;
+  try {
+    const { name, description, sortOrder, isPublished } = req.body || {};
+    await updateAlbum(id, { name, description, sortOrder, isPublished });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Update album failed:', error);
+    res.status(500).json({ error: 'Failed to update album' });
+  }
+});
+
+// DELETE /api/admin/albums/:id — delete album
+app.delete('/api/admin/albums/:id', requireAdmin, async (req, res) => {
+  if (!dbConfigured) {
+    return res.status(503).json({ error: 'Database is not configured' });
+  }
+  const { id } = req.params;
+  try {
+    const deletedId = await deleteAlbum(id);
+    if (!deletedId) {
+      return res.status(404).json({ error: 'Album not found' });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete album failed:', error);
+    res.status(500).json({ error: 'Failed to delete album' });
+  }
+});
+
+// GET /api/albums — public endpoint for published albums
+app.get('/api/albums', async (_req, res) => {
+  if (!dbConfigured) {
+    return res.json({ albums: [] });
+  }
+  try {
+    const albums = await listPublishedAlbums();
+    res.json({ albums: albums.map(a => ({ ...a, id: a.id.toString ? a.id.toString() : a.id })) });
+  } catch (error) {
+    console.error('Error listing albums:', error);
+    res.json({ albums: [] });
+  }
+});
+
+// GET /api/gallery/:albumId — public endpoint for published items in an album
+app.get('/api/gallery/:albumId', async (req, res) => {
+  if (!dbConfigured) {
+    return res.json({ items: [] });
+  }
+  try {
+    const { albumId } = req.params;
+    const rows = await listPublishedGalleryItems(albumId);
+    res.json({ items: rows.map(mapGalleryRow) });
+  } catch (error) {
+    console.error('Error listing gallery:', error);
+    res.json({ items: [] });
+  }
+});
+
+// GET /api/admin/gallery/album/:albumId — admin endpoint for all items in an album
+app.get('/api/admin/gallery/album/:albumId', requireAdmin, async (req, res) => {
+  if (!dbConfigured) {
+    return res.status(503).json({ error: 'Database is not configured' });
+  }
+  try {
+    const { albumId } = req.params;
+    const rows = await listAllGalleryItems(albumId);
+    res.json({ items: rows.map(mapGalleryRow) });
+  } catch (error) {
+    console.error('Error listing gallery items:', error);
+    res.status(500).json({ error: 'Failed to list gallery items' });
+  }
+});
+
+// GET /api/address/lookup
+// Proxy NZ address lookup to avoid CORS and rate limiting
+const addressCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+app.get('/api/address/lookup', async (req, res) => {
+  try {
+    const query = req.query.q;
+
+    if (!query || query.length < 3) {
+      return res.json([]);
+    }
+
+    // Check cache first
+    const cached = addressCache.get(query);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return res.json(cached.data);
+    }
+
+    // Call Nominatim API with proper User-Agent
+    const response = await axios.get(
+      'https://nominatim.openstreetmap.org/search',
+      {
+        params: {
+          format: 'json',
+          q: query,
+          countrycodes: 'nz',
+          limit: 5,
+          addressdetails: 1,
+        },
+        headers: {
+          'User-Agent': 'HakaruRSA/1.0',
+        },
+      }
+    );
+
+    // Cache the result
+    addressCache.set(query, {
+      data: response.data,
+      timestamp: Date.now(),
+    });
+
+    // Clean old cache entries
+    const now = Date.now();
+    for (const [key, value] of addressCache.entries()) {
+      if (now - value.timestamp > CACHE_TTL) {
+        addressCache.delete(key);
+      }
+    }
+
+    res.json(response.data);
+  } catch (error) {
+    console.error('Address lookup error:', error.message);
+    res.status(500).json({ error: 'Address lookup failed' });
+  }
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+});

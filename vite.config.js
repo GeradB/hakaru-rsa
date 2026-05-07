@@ -11,8 +11,14 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    hmr: false,
   },
   esbuild: {
     jsxInject: '',
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    minify: 'esbuild',
   },
 })

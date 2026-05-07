@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
 
 const MEMBERSHIP_FEES = {
   'Returned & Service': 40,
@@ -9,6 +11,9 @@ const MEMBERSHIP_FEES = {
   'Over 90s': 0,
   'Life Member': 0,
 };
+
+const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 
 function FormSection({ title, children }) {
   return (
@@ -53,8 +58,197 @@ function YesNoToggle({ value, onChange }) {
   );
 }
 
+function StripePaymentInner({ amountNzd, currency, receiptEmail, metadata, onPaid }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState("");
+
+  const handlePay = async () => {
+    setPayError("");
+
+    if (!stripe || !elements) {
+      setPayError("Stripe has not finished loading yet. Please wait a moment and try again.");
+      return;
+    }
+
+    setPaying(true);
+
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        redirect: "if_required",
+      });
+
+      if (error) {
+        setPayError(error.message || "Payment failed.");
+        setPaying(false);
+        return;
+      }
+
+      if (!paymentIntent) {
+        setPayError("Unable to confirm payment. Please try again.");
+        setPaying(false);
+        return;
+      }
+
+      if (paymentIntent.status === "succeeded" || paymentIntent.status === "processing") {
+        onPaid?.(paymentIntent);
+        return;
+      }
+
+      setPayError(`Payment status: ${paymentIntent.status}`);
+      setPaying(false);
+    } catch (e) {
+      console.error(e);
+      setPayError("Payment failed. Please try again.");
+      setPaying(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <PaymentElement />
+
+      {payError ? (
+        <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg p-3">{payError}</div>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={handlePay}
+        disabled={!stripe || !elements || paying}
+        className="w-full bg-rsa-navy text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {paying ? "Processing..." : `Pay $${Number(amountNzd).toFixed(2)} ${currency}`}
+      </button>
+    </div>
+  );
+}
+
+function StripePaymentSection({ amountNzd, currency, receiptEmail, metadata, onPaid }) {
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+  const [clientSecret, setClientSecret] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const metadataPayload = useMemo(() => metadata || {}, [metadata]);
+
+  const elementsOptions = useMemo(() => {
+    if (!clientSecret) return null;
+
+    return {
+      clientSecret,
+      appearance: {
+        theme: "stripe",
+        variables: {
+          colorPrimary: "#0f172a",
+          borderRadius: "12px",
+        },
+      },
+    };
+  }, [clientSecret]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      setError("");
+      setClientSecret("");
+      setLoading(true);
+
+      try {
+        const resp = await fetch(`${apiUrl}/api/stripe/create-payment-intent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amountNzd,
+            currency,
+            receiptEmail,
+            metadata: metadataPayload,
+          }),
+        });
+
+        const json = await resp.json();
+
+        if (!resp.ok) {
+          throw new Error(json?.error || `Failed to create payment (${resp.status})`);
+        }
+
+        if (!json?.clientSecret) {
+          throw new Error("Missing client secret from server");
+        }
+
+        if (!cancelled) setClientSecret(json.clientSecret);
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) setError(e?.message || "Could not initialize Stripe payments.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    if (!stripePromise) return;
+
+    const amt = Number(amountNzd);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      setError("Amount must be greater than $0.00 to pay online.");
+      setLoading(false);
+      return;
+    }
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUrl, amountNzd, currency, receiptEmail, metadataPayload]);
+
+  if (!stripePublishableKey || !stripePromise) {
+    return (
+      <div className="border-2 border-dashed border-rsa-navy/30 bg-rsa-navy/5 p-6 rounded-lg">
+        <p className="text-sm font-bold text-rsa-navy">Stripe is not configured</p>
+        <p className="text-xs text-gray-600 mt-2">
+          Add <code className="bg-white px-1 rounded border border-gray-200">VITE_STRIPE_PUBLISHABLE_KEY</code> to your
+          frontend <code className="bg-white px-1 rounded border border-gray-200">.env</code> and restart Vite.
+        </p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="border-2 border-gray-200 bg-white rounded-lg p-6 text-center text-gray-600">
+        Initializing secure card payment...
+      </div>
+    );
+  }
+
+  if (error || !clientSecret) {
+    return (
+      <div className="border-2 border-red-200 bg-red-50 rounded-lg p-4 text-sm text-red-800">
+        <p className="font-bold">Could not load Stripe Payment Element</p>
+        <p className="mt-2">{error || "Missing paymentIntent client secret."}</p>
+        <p className="mt-3 text-xs text-red-900">
+          Make sure your backend is running with{" "}
+          <code className="bg-white px-1 rounded border border-red-200">STRIPE_SECRET_KEY</code> set and CORS allows{" "}
+          <code className="bg-white px-1 rounded border border-red-200">{window.location.origin}</code>.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <Elements stripe={stripePromise} options={elementsOptions}>
+      <StripePaymentInner amountNzd={amountNzd} currency={currency} receiptEmail={receiptEmail} metadata={metadataPayload} onPaid={onPaid} />
+    </Elements>
+  );
+}
+
 export default function HakaruRSARenewal() {
   const [submitted, setSubmitted] = useState(false);
+  const [renewalId, setRenewalId] = useState("");
   const [form, setForm] = useState({
     fullName: '',
     membershipNumber: '',
@@ -84,9 +278,54 @@ export default function HakaruRSARenewal() {
   const canSubmit =
     form.fullName.trim() &&
     form.email.trim() &&
-    form.membershipType &&
-    // keep this light—renewals often have incomplete address info
-    true;
+    form.membershipType;
+
+  const stripeMetadata = useMemo(() => {
+    return {
+      flow: "membership_renewal",
+      membership_type: form.membershipType || "",
+      applicant_email: form.email || "",
+    };
+  }, [form.membershipType, form.email]);
+
+  const handleStripePaid = useCallback(async (paymentIntent) => {
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+    try {
+      // Submit renewal data to database
+      const response = await fetch(`${apiUrl}/api/renewal/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ formData: form, fee, donation: donationAmount, total }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setRenewalId(data.renewalId);
+
+        // Update payment information and write all fields to database
+        await fetch(`${apiUrl}/api/renewal/update-payment`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            renewalId: data.renewalId,
+            paymentIntentId: paymentIntent.id,
+            status: paymentIntent.status,
+            amount: total,
+            formData: form,
+            fee,
+            donation: donationAmount,
+          }),
+        });
+      }
+
+      setSubmitted(true);
+    } catch (error) {
+      console.error("Error submitting renewal:", error);
+      setSubmitted(true);
+    }
+  }, [form, fee, donationAmount, total]);
 
   if (submitted) {
     return (
@@ -100,8 +339,14 @@ export default function HakaruRSARenewal() {
             </div>
             <h1 className="text-3xl font-bold font-heading text-rsa-navy mb-4">Renewal Submitted</h1>
             <p className="text-gray-600 mb-6">
-              Thanks, <span className="font-bold text-rsa-navy">{form.fullName}</span>. We’ve received your renewal request.
+              Thanks, <span className="font-bold text-rsa-navy">{form.fullName}</span>. We've received your renewal request.
             </p>
+            {renewalId && (
+              <div className="bg-rsa-navy/5 border border-rsa-navy/20 rounded-lg p-3 mb-6">
+                <p className="text-sm font-bold text-rsa-navy">Renewal Reference</p>
+                <p className="text-lg font-mono text-rsa-navy">{renewalId}</p>
+              </div>
+            )}
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 text-left">
               <p className="text-green-900 text-sm">
                 <strong>Email:</strong> {form.email}
@@ -293,7 +538,7 @@ export default function HakaruRSARenewal() {
             </div>
             <div className="flex items-start justify-between gap-6 border-2 border-rsa-navy/10 rounded-lg p-4">
               <div>
-                <p className="font-bold text-rsa-navy">Women’s section</p>
+                <p className="font-bold text-rsa-navy">Women's section</p>
                 <p className="text-sm text-gray-600">
                   Ladies, I consent to my contact details to be passed to the Hakaru RSA Women&apos;s section.
                 </p>
@@ -379,14 +624,29 @@ export default function HakaruRSARenewal() {
               By submitting this renewal I confirm that all information provided is correct and up to date.
             </div>
 
-            <button
-              type="button"
-              onClick={() => setSubmitted(true)}
-              disabled={!canSubmit}
-              className="w-full bg-rsa-navy text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-opacity-90 transition-all focus:ring-4 focus:ring-rsa-navy/50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Submit Renewal
-            </button>
+            {total > 0 ? (
+              <div>
+                <p className="text-lg font-bold text-rsa-navy mb-4">Card Payment</p>
+                <div className="border-2 border-gray-200 bg-white rounded-lg p-6">
+                  <StripePaymentSection
+                    amountNzd={total}
+                    currency={import.meta.env.VITE_CURRENCY || "NZD"}
+                    receiptEmail={form.email}
+                    metadata={stripeMetadata}
+                    onPaid={handleStripePaid}
+                  />
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleStripePaid({ id: 'no-payment-required', status: 'succeeded' })}
+                disabled={!canSubmit}
+                className="w-full bg-rsa-navy text-white px-8 py-4 rounded-lg font-bold text-lg hover:bg-opacity-90 transition-all focus:ring-4 focus:ring-rsa-navy/50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Submit Renewal (No Payment Required)
+              </button>
+            )}
 
             <div className="text-center">
               <Link to="/membership" className="inline-flex items-center text-rsa-navy hover:text-rsa-gold transition-colors">
@@ -402,4 +662,3 @@ export default function HakaruRSARenewal() {
     </div>
   );
 }
-
