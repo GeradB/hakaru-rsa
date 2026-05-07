@@ -42,7 +42,7 @@ jobs:
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3
         with:
-          app-name: 'hakaru-api-fyfrgkgmh9a3c7gt'
+          app-name: 'hakaru-api'
           slot-name: 'Production'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: .
