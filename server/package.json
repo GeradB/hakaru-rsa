@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "verify:bundle": "node -e \"import('./cmsMerge.js').then(()=>console.log('cmsMerge + siteContent.defaults.js OK'))\""
   },
   "dependencies": {
     "@azure/storage-blob": "^12.28.0",

@@ -22,6 +22,13 @@ jobs:
         working-directory: ./server
         run: npm ci --only=production
 
+      - name: Verify CMS merge bundle
+        working-directory: ./server
+        run: |
+          test -f siteContent.defaults.js
+          ! grep -qE '\.\./shared/siteContent' cmsMerge.js
+          npm run verify:bundle
+
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:

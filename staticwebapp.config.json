@@ -22,12 +22,12 @@
   },
   "routes": [
     {
-      "route": "/admin/*",
-      "allowedRoles": ["authenticated"]
-    },
-    {
       "route": "/admin/login",
       "rewrite": "/.auth/login/aad"
+    },
+    {
+      "route": "/admin/*",
+      "allowedRoles": ["authenticated"]
     },
     {
       "route": "/.auth/login/aad",

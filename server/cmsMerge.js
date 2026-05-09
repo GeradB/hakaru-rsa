@@ -1,3 +1,4 @@
+// Defaults must live in this folder (./siteContent.defaults.js) — Azure deploys `server/` only; do not use ../shared/
 import defaultSiteContent from './siteContent.defaults.js';
 
 export const CMS_SLUGS = Object.freeze([

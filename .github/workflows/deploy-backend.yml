@@ -23,6 +23,13 @@ jobs:
         working-directory: ./server
         run: npm ci --only=production
 
+      - name: Verify CMS merge bundle (fails if siteContent.defaults.js missing or old ../shared import)
+        working-directory: ./server
+        run: |
+          test -f siteContent.defaults.js
+          ! grep -qE '\.\./shared/siteContent' cmsMerge.js
+          npm run verify:bundle
+
       - name: Deploy to Azure Web App
         uses: Azure/webapps-deploy@v3
         with:
