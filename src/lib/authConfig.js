@@ -1,4 +1,11 @@
 // MSAL Authentication Configuration for Entra ID
+//
+// AADSTS9002326 ("Cross-origin token redemption… Single-Page Application"):
+// In Azure Portal → App registrations → this app → Authentication, redirect URIs
+// MUST be under platform "Single-page application", NOT "Web". Remove duplicate URIs
+// from Web. Add each deployed origin, e.g. https://….azurestaticapps.net/admin/login
+// and http(s)://localhost:5173/admin/login for dev (HTTPS if Vite uses HTTPS).
+
 const msalConfig = {
   auth: {
     clientId: "4fafdc19-8a0c-4021-8d27-32a2a1594772",

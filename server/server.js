@@ -48,6 +48,14 @@ import {
   CMS_SLUGS,
   getDefaultSiteContent,
 } from './cmsMerge.js';
+import {
+  createDonorDonationEmail,
+  createAdminDonationEmail,
+  createMembershipConfirmationEmail,
+  createAdminMembershipEmail,
+  createRenewalConfirmationEmail,
+  createAdminRenewalEmail,
+} from './emailTemplates.js';
 
 dotenv.config();
 
@@ -225,17 +233,40 @@ const upload = multer({
   limits: { fileSize: MAX_GALLERY_UPLOAD_BYTES },
 });
 
-// Email transporter setup
+// Email transporter setup - Office 365 / Microsoft 365 SMTP
 const createTransporter = () => {
   return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+    host: process.env.EMAIL_HOST || 'smtp.office365.com',
     port: parseInt(process.env.EMAIL_PORT) || 587,
-    secure: false,
+    secure: false, // true for 465, false for other ports
     auth: {
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD,
+      pass: process.env.EMAIL_PASS,
+    },
+    // Office 365 requires TLS
+    tls: {
+      ciphers: 'SSLv3',
+      rejectUnauthorized: false, // Required for some Office 365 setups
     },
   });
+};
+
+// Helper to send emails with error handling
+const sendEmail = async (to, subject, html) => {
+  try {
+    const transporter = createTransporter();
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM,
+      to,
+      subject,
+      html,
+    });
+    console.log(`Email sent to ${to}: ${subject}`);
+    return true;
+  } catch (error) {
+    console.error(`Failed to send email to ${to}:`, error.message);
+    return false;
+  }
 };
 
 // Generate unique transaction reference
@@ -292,99 +323,116 @@ app.post('/api/stripe/create-payment-intent', async (req, res) => {
 });
 
 
-// Send confirmation email to member
-const sendConfirmationEmail = async (data, txnRef) => {
+// Send donation confirmation emails (to donor and admin)
+const sendDonationEmails = async (formData, transactionRef, paidAt) => {
   try {
-    const transporter = createTransporter();
+    const { donorType, fullName, organisationName, email, isAnonymous, amount, timing, interval, phone, mailingAddress, mailingTown, mailingPostCode } = formData;
 
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #1a365d;">Membership Confirmation - Hakaru & Districts RSA</h2>
+    // Send confirmation to donor (if not anonymous)
+    if (!isAnonymous && email) {
+      const donorEmail = createDonorDonationEmail({
+        fullName,
+        organisationName,
+        email,
+        amount,
+        timing,
+        interval,
+        donorType,
+        isAnonymous,
+        transactionRef,
+        paidAt,
+      });
+      await sendEmail(email, donorEmail.subject, donorEmail.html);
+    }
 
-        <p>Dear ${data.fullName},</p>
-
-        <p>Thank you for your membership application to Hakaru & Districts RSA.</p>
-
-        <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="color: #2d3748; margin-top: 0;">Application Details</h3>
-          <p><strong>Name:</strong> ${data.fullName}</p>
-          <p><strong>Email:</strong> ${data.email}</p>
-          <p><strong>Phone:</strong> ${data.phone}</p>
-          <p><strong>Address:</strong> ${data.address}</p>
-          <p><strong>Date:</strong> ${data.date}</p>
-        </div>
-
-        <div style="background: #f0fff4; padding: 15px; border-radius: 8px; border-left: 4px solid #48bb78;">
-          <p><strong>Payment Status:</strong> Paid</p>
-          <p><strong>Amount:</strong> $${data.amount.toFixed(2)} ${data.currency}</p>
-          <p><strong>Transaction Reference:</strong> ${txnRef}</p>
-        </div>
-
-        <p>Your provisional membership is now active. You will receive your membership card shortly.</p>
-
-        <p style="color: #718096; font-size: 14px; margin-top: 30px;">
-          If you have any questions, please contact us at admin@hakaru-rsa.org.nz
-        </p>
-
-        <p>Kind regards,<br>Hakaru & Districts RSA</p>
-      </div>
-    `;
-
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
-      to: data.email,
-      subject: 'Membership Confirmation - Hakaru RSA',
-      html: htmlContent,
+    // Send admin notification
+    const adminEmail = createAdminDonationEmail({
+      fullName,
+      organisationName,
+      email,
+      amount,
+      timing,
+      interval,
+      donorType,
+      isAnonymous,
+      phone,
+      mailingAddress,
+      mailingTown,
+      mailingPostCode,
+      transactionRef,
+      paidAt,
     });
-
-    console.log(`Confirmation email sent to ${data.email}`);
+    await sendEmail(process.env.EMAIL_TO, adminEmail.subject, adminEmail.html);
   } catch (error) {
-    console.error('Error sending confirmation email:', error);
+    console.error('Error sending donation emails:', error);
   }
 };
 
-// Send admin notification email
-const sendAdminNotification = async (data, txnRef) => {
+// Send membership application emails (to applicant and admin)
+const sendMembershipEmails = async (formData, transactionRef) => {
   try {
-    const transporter = createTransporter();
+    const { fullName, fullName2, email, membershipType, fee, donation, total, mailingAddress, mailingTown, mailingPostCode } = formData;
 
-    const htmlContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #1a365d;">New Membership Application</h2>
-
-        <p>A new membership application has been received and paid.</p>
-
-        <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <h3 style="color: #2d3748; margin-top: 0;">Member Details</h3>
-          <p><strong>Name:</strong> ${data.fullName}</p>
-          <p><strong>Email:</strong> ${data.email}</p>
-          <p><strong>Phone:</strong> ${data.phone}</p>
-          <p><strong>Address:</strong> ${data.address}</p>
-          <p><strong>Application Date:</strong> ${data.date}</p>
-        </div>
-
-        <div style="background: #f0fff4; padding: 15px; border-radius: 8px; border-left: 4px solid #48bb78;">
-          <p><strong>Payment:</strong> $${data.amount.toFixed(2)} ${data.currency}</p>
-          <p><strong>Transaction Reference:</strong> ${txnRef}</p>
-          <p><strong>Paid At:</strong> ${data.paidAt}</p>
-        </div>
-
-        <p style="color: #718096; font-size: 14px; margin-top: 30px;">
-          Please process this membership application and issue the membership card.
-        </p>
-      </div>
-    `;
-
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
-      to: process.env.EMAIL_TO,
-      subject: `New Membership: ${data.fullName}`,
-      html: htmlContent,
+    // Send confirmation to applicant
+    const confirmationEmail = createMembershipConfirmationEmail({
+      fullName,
+      fullName2,
+      email,
+      membershipType,
+      fee,
+      donation,
+      total,
+      transactionRef,
+      mailingAddress,
+      mailingTown,
+      mailingPostCode,
     });
+    await sendEmail(email, confirmationEmail.subject, confirmationEmail.html);
 
-    console.log(`Admin notification sent for ${data.email}`);
+    // Send admin notification
+    const adminEmail = createAdminMembershipEmail({
+      ...formData,
+      transactionRef,
+    });
+    await sendEmail(process.env.EMAIL_TO, adminEmail.subject, adminEmail.html);
   } catch (error) {
-    console.error('Error sending admin notification:', error);
+    console.error('Error sending membership emails:', error);
+  }
+};
+
+// Send renewal confirmation emails (to member and admin)
+const sendRenewalEmails = async (formData, transactionRef) => {
+  try {
+    const { fullName, email, membershipType, fee, donation, total, mailingAddress, mailingTown, mailingPostCode } = formData;
+
+    // Send confirmation to member
+    const confirmationEmail = createRenewalConfirmationEmail({
+      fullName,
+      email,
+      membershipType,
+      fee,
+      donation,
+      total,
+      transactionRef,
+      mailingAddress,
+      mailingTown,
+      mailingPostCode,
+    });
+    await sendEmail(email, confirmationEmail.subject, confirmationEmail.html);
+
+    // Send admin notification
+    const adminEmail = createAdminRenewalEmail({
+      fullName,
+      email,
+      membershipType,
+      fee,
+      donation,
+      total,
+      transactionRef,
+    });
+    await sendEmail(process.env.EMAIL_TO, adminEmail.subject, adminEmail.html);
+  } catch (error) {
+    console.error('Error sending renewal emails:', error);
   }
 };
 
@@ -470,6 +518,20 @@ app.post('/api/membership/update-payment', async (req, res) => {
     if (dbConfigured) {
       await updateMembership(membershipId, formData || {}, paymentData);
       console.log(`Membership ${membershipId} updated with payment: ${status}`);
+
+      // Send emails on successful payment
+      if (status === 'succeeded') {
+        const membership = await getMembership(membershipId);
+        if (membership) {
+          const txnRef = membership.stripe_payment_intent_id || membershipId;
+          await sendMembershipEmails({
+            ...formData,
+            fee: membership.fee,
+            donation: membership.donation,
+            total: membership.total,
+          }, txnRef);
+        }
+      }
     } else {
       // Fallback: find and update in-memory record
       for (const [key, value] of pendingMemberships.entries()) {
@@ -577,32 +639,41 @@ app.post('/api/renewal/update-payment', async (req, res) => {
   }
 });
 
-// POST /api/donation/submit
-// Submit donation to database
-app.post('/api/donation/submit', async (req, res) => {
+// POST /api/renewal/update-payment
+// Update renewal with payment information and all form data
+app.post('/api/renewal/update-payment', async (req, res) => {
   try {
-    const { formData } = req.body;
+    const { renewalId, paymentIntentId, status, amount, formData, fee, donation } = req.body;
 
-    if (!formData || !formData.email) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    if (!renewalId) {
+      return res.status(400).json({ error: 'Missing renewalId' });
     }
+
+    const paymentData = {
+      stripePaymentIntentId: paymentIntentId,
+      paymentStatus: status,
+      amountPaid: amount,
+      fee,
+      total: donation ? (fee || 0) + (parseFloat(donation) || 0) : (fee || 0),
+      paidAt: status === 'succeeded' ? new Date().toISOString() : null,
+      status: status === 'succeeded' ? 'paid' : status,
+    };
 
     if (dbConfigured) {
-      const donationId = await createDonation(formData);
+      await updateRenewal(renewalId, formData || {}, paymentData);
+      console.log(`Renewal ${renewalId} updated with payment: ${status}`);
 
-      console.log(`Donation created in database: ${donationId} for ${formData.email}`);
-
-      res.json({
-        success: true,
-        donationId,
-        message: 'Donation submitted',
-      });
-    } else {
-      return res.status(503).json({ error: 'Database is not configured' });
+      // Send emails on successful payment
+      if (status === 'succeeded') {
+        const txnRef = paymentIntentId || renewalId;
+        await sendRenewalEmails({ ...formData, fee, donation, total: paymentData.total }, txnRef);
+      }
     }
+
+    res.json({ success: true });
   } catch (error) {
-    console.error('Error creating donation:', error);
-    res.status(500).json({ error: 'Failed to create donation' });
+    console.error('Error updating payment:', error);
+    res.status(500).json({ error: 'Failed to update payment information' });
   }
 });
 
@@ -627,6 +698,12 @@ app.post('/api/donation/update-payment', async (req, res) => {
     if (dbConfigured) {
       await updateDonation(donationId, formData || {}, paymentData);
       console.log(`Donation ${donationId} updated with payment: ${status}`);
+
+      // Send emails on successful payment
+      if (status === 'succeeded') {
+        const txnRef = paymentIntentId || donationId;
+        await sendDonationEmails(formData, txnRef, paymentData.paidAt);
+      }
     }
 
     res.json({ success: true });
