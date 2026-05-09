@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { apiUrl } from '../apiBase';
 import { signOutAdmin } from '../lib/adminSignOut';
 
@@ -27,6 +27,8 @@ const btnSecondary =
 
 export default function AdminGallery() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const adminLoginHref = `/admin/login?returnUrl=${encodeURIComponent(location.pathname)}`;
   const [albums, setAlbums] = useState([]);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +68,7 @@ export default function AdminGallery() {
     if (res.status === 401) {
       localStorage.removeItem('adminAuth');
       localStorage.removeItem('entraIdToken');
-      navigate('/admin/login', { replace: true });
+      navigate(adminLoginHref, { replace: true });
       return;
     }
     if (!res.ok) {
@@ -75,7 +77,7 @@ export default function AdminGallery() {
     }
     const data = await res.json();
     setAlbums(data.albums || []);
-  }, [navigate]);
+  }, [navigate, adminLoginHref]);
 
   const loadItems = useCallback(
     async (albumId = null) => {
@@ -90,7 +92,7 @@ export default function AdminGallery() {
       if (res.status === 401) {
         localStorage.removeItem('adminAuth');
         localStorage.removeItem('entraIdToken');
-        navigate('/admin/login', { replace: true });
+        navigate(adminLoginHref, { replace: true });
         return;
       }
       if (!res.ok) {
@@ -100,7 +102,7 @@ export default function AdminGallery() {
       const data = await res.json();
       setItems(data.items || []);
     },
-    [navigate],
+    [navigate, adminLoginHref],
   );
 
   const load = useCallback(async () => {
@@ -233,7 +235,7 @@ export default function AdminGallery() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 401) {
-        navigate('/admin/login', { replace: true });
+        navigate(adminLoginHref, { replace: true });
         return;
       }
       if (!res.ok) throw new Error(data.error || 'Upload failed');

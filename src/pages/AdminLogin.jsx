@@ -1,14 +1,23 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { loginRequest } from '../lib/authConfig';
 import { initializeMsal } from '../lib/msalInstance';
 import { signOutAdmin } from '../lib/adminSignOut';
+import {
+  rememberAdminReturnFromSearch,
+  consumeAdminReturnPath,
+} from '../lib/adminReturnUrl';
 
 export default function AdminLogin() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [error, setError] = useState(null);
   const [msalInstance, setMsalInstance] = useState(null);
   const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    rememberAdminReturnFromSearch(searchParams);
+  }, [searchParams]);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,7 +45,7 @@ export default function AdminLogin() {
                 if (cancelled) return;
                 if (tokenResponse.idToken) {
                   localStorage.setItem('entraIdToken', tokenResponse.idToken);
-                  navigate('/admin/gallery', { replace: true });
+                  navigate(consumeAdminReturnPath(), { replace: true });
                 }
               })
               .catch(() => {
@@ -68,7 +77,7 @@ export default function AdminLogin() {
         localStorage.setItem('entraIdToken', response.idToken);
         localStorage.setItem('adminAuth', 'true');
       }
-      navigate('/admin/gallery', { replace: true });
+      navigate(consumeAdminReturnPath(), { replace: true });
     }).catch((err) => {
       console.error('Redirect handler error:', err);
     });
@@ -127,6 +136,13 @@ export default function AdminLogin() {
               <p className="text-green-900 font-bold">{activeAccount.name || activeAccount.username}</p>
               <p className="text-green-700 text-sm">{activeAccount.idTokenClaims?.email}</p>
             </div>
+            <button
+              type="button"
+              onClick={() => navigate(consumeAdminReturnPath(), { replace: true })}
+              className="w-full bg-rsa-gold text-rsa-navy py-3 rounded-md font-bold hover:bg-yellow-400 focus:ring-4 focus:ring-rsa-gold/50"
+            >
+              Continue to admin
+            </button>
             <button
               type="button"
               onClick={handleLogout}

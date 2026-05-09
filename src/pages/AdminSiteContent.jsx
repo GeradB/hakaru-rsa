@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { apiUrl } from '../apiBase';
 import { signOutAdmin } from '../lib/adminSignOut';
 
@@ -17,6 +17,8 @@ const CMS_SLUG_LABELS = {
 
 export default function AdminSiteContent() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const adminLoginHref = `/admin/login?returnUrl=${encodeURIComponent(location.pathname)}`;
   const [slugs, setSlugs] = useState([]);
   const [slug, setSlug] = useState('global');
   const [jsonText, setJsonText] = useState('{}');
@@ -40,7 +42,7 @@ export default function AdminSiteContent() {
       if (res.status === 401) {
         localStorage.removeItem('adminAuth');
         localStorage.removeItem('entraIdToken');
-        navigate('/admin/login', { replace: true });
+        navigate(adminLoginHref, { replace: true });
         return;
       }
       if (!res.ok) {
@@ -50,7 +52,7 @@ export default function AdminSiteContent() {
       const data = await res.json();
       setJsonText(JSON.stringify(data.fragment || {}, null, 2));
     },
-    [navigate],
+    [navigate, adminLoginHref],
   );
 
   useEffect(() => {
@@ -64,7 +66,7 @@ export default function AdminSiteContent() {
         if (res.status === 401) {
           localStorage.removeItem('adminAuth');
           localStorage.removeItem('entraIdToken');
-          navigate('/admin/login', { replace: true });
+          navigate(adminLoginHref, { replace: true });
           return;
         }
         const data = await res.json();
@@ -78,7 +80,7 @@ export default function AdminSiteContent() {
     return () => {
       cancelled = true;
     };
-  }, [navigate]);
+  }, [navigate, adminLoginHref]);
 
   useEffect(() => {
     if (!slug || loading) return;

@@ -6,34 +6,7 @@
   "mimeTypes": {
     ".json": "application/json"
   },
-  "auth": {
-    "identityProviders": {
-      "azureActiveDirectory": {
-        "registration": {
-          "clientId": "${CLIENT_ID}",
-          "clientSecret": "${CLIENT_SECRET}",
-          "issuer": "${ISSUER}",
-          "loginParameters": {
-            "scope": ["openid", "profile", "email"]
-          }
-        }
-      }
-    }
-  },
   "routes": [
-    {
-      "route": "/admin/login",
-      "rewrite": "/.auth/login/aad"
-    },
-    {
-      "route": "/admin/*",
-      "allowedRoles": ["authenticated"]
-    },
-    {
-      "route": "/.auth/login/aad",
-      "statusCode": "302",
-      "redirect": "/admin/"
-    },
     {
       "route": "/.auth/logout",
       "redirect": "/"
