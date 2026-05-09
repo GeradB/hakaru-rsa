@@ -1,4 +1,4 @@
--- Site content patches (merged with shared/siteContent.defaults.js in the API)
+-- Site content patches (merged with server/siteContent.defaults.js in the API)
 -- Run against your Hakaru RSA database after core tables exist.
 
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'cms_content_patches')

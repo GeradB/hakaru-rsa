@@ -57,30 +57,39 @@ const PORT = process.env.PORT || 3001;
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 
+/** Strip trailing slashes so env and browser Origin match */
+const normalizeOrigin = (s) => (typeof s === 'string' ? s.trim().replace(/\/+$/, '') : '');
+
 const resolveAllowedOrigins = () => {
   const raw = process.env.FRONTEND_URLS || process.env.FRONTEND_URL || '';
   const urls = raw
     .split(',')
-    .map((s) => s.trim())
+    .map((s) => normalizeOrigin(s))
     .filter(Boolean);
 
-  return urls.length ? urls : ['http://localhost:5173'];
+  return urls.length ? urls : [normalizeOrigin('http://localhost:5173')];
 };
 
-// Middleware
-app.use(cors({
-  origin: (origin, callback) => {
-    const allowed = resolveAllowedOrigins();
+// Middleware — browsers require your Static Web App URL in FRONTEND_URLS (see server/.env.example)
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      const allowed = resolveAllowedOrigins();
 
-    // Allow non-browser clients / Postman
-    if (!origin) return callback(null, true);
+      // Same-origin / server-side / curl (no Origin header)
+      if (!origin) return callback(null, true);
 
-    if (allowed.includes(origin)) return callback(null, true);
+      const o = normalizeOrigin(origin);
+      if (allowed.includes(o)) return callback(null, true);
 
-    return callback(new Error(`Not allowed by CORS: ${origin}`));
-  },
-  credentials: true
-}));
+      console.warn(`CORS rejected Origin="${origin}"; set FRONTEND_URLS on the API (allowed: ${allowed.join(', ')})`);
+      return callback(null, false);
+    },
+    credentials: true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  }),
+);
 app.use(express.json());
 app.use(cookieParser());
 
@@ -1140,7 +1149,7 @@ const HTTPS_PORT = parseInt(HTTP_PORT) + 1 || 3002;
 // Start HTTP server
 app.listen(HTTP_PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${HTTP_PORT}`);
-  console.log(`Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+  console.log(`CORS allowed origins (FRONTEND_URLS): ${resolveAllowedOrigins().join(' | ')}`);
 });
 
 // Start HTTPS server for local development with MSAL

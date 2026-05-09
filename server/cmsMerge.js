@@ -1,4 +1,4 @@
-import defaultSiteContent from '../shared/siteContent.defaults.js';
+import defaultSiteContent from './siteContent.defaults.js';
 
 export const CMS_SLUGS = Object.freeze([
   'global',
