@@ -1,19 +1,35 @@
 import { Link } from 'react-router-dom';
-import { siteContent } from '../content';
+import { useSiteContent } from '../context/SiteContentContext';
 
 export default function Home() {
-  const { hero, welcome, announcements, upcomingEvents } = siteContent;
+  const siteContent = useSiteContent();
+  const { hero, welcome, announcements, upcomingEvents, homeCta } = siteContent;
 
-  console.log('Home component rendering', { hero, welcome });
+  const heroBg =
+    hero?.imageUrl && String(hero.imageUrl).trim() ? (
+      <div className="absolute inset-0 z-0" aria-hidden>
+        <img
+          src={hero.imageUrl.trim()}
+          alt=""
+          className="h-full w-full object-cover opacity-[0.22]"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-rsa-navy/80 via-rsa-navy/85 to-rsa-navy" />
+      </div>
+    ) : (
+      <div className="absolute inset-0 z-0 opacity-10">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')]"></div>
+      </div>
+    );
+
+  const cta = homeCta || {};
+  const showWelcomeImg = welcome?.imageUrl && String(welcome.imageUrl).trim();
 
   return (
     <div className="bg-gradient-to-b from-rsa-navy via-slate-800 to-rsa-navy min-h-screen">
       {/* Hero Section */}
       <section className="relative overflow-hidden py-24 md:py-32">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')]"></div>
-        </div>
-        <div className="max-w-4xl mx-auto px-4 relative z-10 text-center">
+        {heroBg}
+        <div className="relative z-10 max-w-4xl mx-auto px-4 text-center">
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 font-heading leading-tight">
             {hero.title}
           </h1>
@@ -21,7 +37,7 @@ export default function Home() {
             {hero.subtitle}
           </p>
           <Link
-            to={hero.ctaLink}
+            to={hero.ctaLink || '/membership/become'}
             className="inline-flex items-center bg-rsa-gold text-rsa-navy px-8 py-4 rounded-md font-bold text-lg hover:bg-yellow-400 transition-all hover:scale-105 hover:shadow-xl focus:ring-4 focus:ring-rsa-gold/50"
           >
             {hero.ctaText}
@@ -35,7 +51,16 @@ export default function Home() {
       {/* Welcome Section */}
       <section className="py-20">
         <div className="max-w-4xl mx-auto px-4 text-center">
-          <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl p-8 md:p-12">
+          <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl p-8 md:p-12 overflow-hidden">
+            {showWelcomeImg && (
+              <div className="mb-8 -mx-8 -mt-8 md:-mx-12 md:-mt-12">
+                <img
+                  src={welcome.imageUrl.trim()}
+                  alt=""
+                  className="w-full max-h-72 object-cover"
+                />
+              </div>
+            )}
             <h2 className="text-3xl md:text-4xl font-bold font-heading text-rsa-navy mb-6">
               {welcome.title}
             </h2>
@@ -53,10 +78,11 @@ export default function Home() {
             {announcements.title}
           </h2>
           <p className="text-gray-400 text-center mb-12 max-w-2xl mx-auto">
-            Stay up to date with the latest news and happenings at Hakaru RSA
+            {announcements.subtitle ||
+              'Stay up to date with the latest news and happenings at Hakaru RSA'}
           </p>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {announcements.items.map((item) => (
+            {(announcements.items || []).map((item) => (
               <div
                 key={item.id}
                 className="bg-white/95 backdrop-blur rounded-xl shadow-xl p-6 border-t-4 border-rsa-gold hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
@@ -79,10 +105,11 @@ export default function Home() {
             {upcomingEvents.title}
           </h2>
           <p className="text-gray-400 text-center mb-12 max-w-2xl mx-auto">
-            Join us for regular events and special occasions
+            {upcomingEvents.subtitle ||
+              'Join us for regular events and special occasions'}
           </p>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {upcomingEvents.events.map((event) => (
+            {(upcomingEvents.events || []).map((event) => (
               <div
                 key={event.id}
                 className="bg-white/95 backdrop-blur rounded-xl shadow-xl p-6 border-l-4 border-rsa-red hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
@@ -118,22 +145,33 @@ export default function Home() {
       {/* Call to Action Banner */}
       <section className="py-16">
         <div className="max-w-4xl mx-auto px-4">
-          <div className="bg-rsa-gold rounded-2xl shadow-2xl p-8 md:p-12 text-center">
-            <h2 className="text-2xl md:text-3xl font-bold font-heading text-rsa-navy mb-4">
-              Ready to Join Our Community?
-            </h2>
-            <p className="text-rsa-navy/80 mb-8 max-w-xl mx-auto">
-              Become a member today and enjoy access to all our facilities, events, and a supportive community of veterans and locals.
-            </p>
-            <Link
-              to="/membership/become"
-              className="inline-flex items-center bg-rsa-navy text-white px-8 py-4 rounded-md font-bold text-lg hover:bg-slate-800 transition-all hover:scale-105 focus:ring-4 focus:ring-rsa-navy/50"
-            >
-              Become a Member
-              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
+          <div className="bg-rsa-gold rounded-2xl shadow-2xl overflow-hidden text-center">
+            {cta.imageUrl && String(cta.imageUrl).trim() && (
+              <img
+                src={cta.imageUrl.trim()}
+                alt=""
+                className="w-full max-h-56 object-cover"
+              />
+            )}
+            <div className="p-8 md:p-12">
+              <h2 className="text-2xl md:text-3xl font-bold font-heading text-rsa-navy mb-4">
+                {cta.title ||
+                  'Ready to Join Our Community?'}
+              </h2>
+              <p className="text-rsa-navy/80 mb-8 max-w-xl mx-auto">
+                {cta.body ||
+                  'Become a member today and enjoy access to all our facilities, events, and a supportive community.'}
+              </p>
+              <Link
+                to={cta.buttonLink || '/membership/become'}
+                className="inline-flex items-center bg-rsa-navy text-white px-8 py-4 rounded-md font-bold text-lg hover:bg-slate-800 transition-all hover:scale-105 focus:ring-4 focus:ring-rsa-navy/50"
+              >
+                {cta.buttonText || 'Become a Member'}
+                <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
           </div>
         </div>
       </section>

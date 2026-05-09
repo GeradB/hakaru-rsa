@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { apiUrl } from '../apiBase';
 import { getStripe } from '../lib/stripe';
+import { useSiteContent } from '../context/SiteContentContext';
 
 const PRESET_AMOUNTS = [20, 50, 100];
 const INTERVALS = [
@@ -244,6 +245,9 @@ function StripePaymentSection({ amount, timing, interval, donorType, isAnonymous
 }
 
 export default function Donation() {
+  const siteContent = useSiteContent();
+  const donatePage = siteContent.donatePage || {};
+
   const [amount, setAmount] = useState(50);
   const [customAmount, setCustomAmount] = useState('');
   const [timing, setTiming] = useState('one-off');
@@ -301,12 +305,15 @@ export default function Donation() {
     return (
       <div className="max-w-2xl mx-auto px-4 py-12">
         <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
-          <h2 className="text-2xl font-bold text-green-800 mb-4">Thank You for Your Donation!</h2>
+          <h2 className="text-2xl font-bold text-green-800 mb-4">
+            {donatePage.successTitle || 'Thank You for Your Donation!'}
+          </h2>
           <p className="text-green-700 mb-6">
-            Your generous donation has been received. A confirmation email will be sent shortly.
+            {donatePage.successBody ||
+              'Your generous donation has been received. A confirmation email will be sent shortly.'}
           </p>
           <p className="text-green-600 text-sm">
-            Transaction reference has been recorded.
+            {donatePage.successFootnote || 'Transaction reference has been recorded.'}
           </p>
           <a
             href="/donate"
@@ -321,10 +328,20 @@ export default function Donation() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-12">
-      <h1 className="text-3xl font-bold text-rsa-navy mb-2">Make a Donation</h1>
+      <h1 className="text-3xl font-bold text-rsa-navy mb-2">
+        {donatePage.title || 'Make a Donation'}
+      </h1>
       <p className="text-gray-600 mb-8">
-        Support Hakaru & Districts RSA with a donation. Your contribution helps us continue our mission.
+        {donatePage.intro ||
+          'Support Hakaru & Districts RSA with a donation. Your contribution helps us continue our mission.'}
       </p>
+      {donatePage.imageUrl?.trim?.() ? (
+        <img
+          src={donatePage.imageUrl.trim()}
+          alt=""
+          className="mb-8 w-full max-h-56 rounded-lg object-cover shadow-md"
+        />
+      ) : null}
 
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-xl font-semibold text-rsa-navy mb-4">Donation Amount</h2>

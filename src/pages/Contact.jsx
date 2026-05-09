@@ -1,6 +1,7 @@
-import { siteContent } from '../content';
+import { useSiteContent } from '../context/SiteContentContext';
 
 export default function Contact() {
+  const siteContent = useSiteContent();
   const { contact } = siteContent;
 
   return (
@@ -10,7 +11,7 @@ export default function Contact() {
           {contact.title}
         </h1>
         <p className="text-lg md:text-xl text-gray-300 text-center mb-12 max-w-2xl mx-auto">
-          Get in touch or visit us
+          {contact.pageSubtitle || 'Get in touch or visit us'}
         </p>
 
         <div className="grid md:grid-cols-2 gap-8">

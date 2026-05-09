@@ -24,6 +24,15 @@ const inputClass =
 const labelClass = "block text-sm font-bold text-rsa-navy mb-2";
 const sectionTitle = "text-xl font-bold font-heading text-rsa-navy mb-4";
 
+/** Calendar years for service enlistment / discharge pickers */
+const SERVICE_YEAR_MIN = 1930;
+function buildServiceYearList() {
+  const max = new Date().getFullYear() + 1;
+  const years = [];
+  for (let y = max; y >= SERVICE_YEAR_MIN; y -= 1) years.push(y);
+  return years;
+}
+
 
 function StripePaymentInner({ amountNzd, currency, receiptEmail, metadata, onPaid }) {
   const stripe = useStripe();
@@ -223,6 +232,11 @@ export default function HakaruRSAMembership() {
   const [addressLoading, setAddressLoading] = useState(false);
   const [showAddressResults, setShowAddressResults] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [physicalAddressSearch, setPhysicalAddressSearch] = useState("");
+  const [physicalAddressResults, setPhysicalAddressResults] = useState([]);
+  const [physicalAddressLoading, setPhysicalAddressLoading] = useState(false);
+  const [showPhysicalAddressResults, setShowPhysicalAddressResults] = useState(false);
+  const [debouncedPhysicalSearch, setDebouncedPhysicalSearch] = useState("");
   const [form, setForm] = useState({
     // Personal
     fullName: "",
@@ -304,41 +318,23 @@ export default function HakaruRSAMembership() {
   };
 
   // NZ Address lookup - proxied through backend to avoid CORS and rate limiting
-  const searchAddress = useCallback(async (query) => {
-    if (query.length < 3) {
-      setAddressResults([]);
-      setShowAddressResults(false);
-      return;
-    }
-
-    setAddressLoading(true);
-    try {
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001";
-      const response = await fetch(`${apiUrl}/api/address/lookup?q=${encodeURIComponent(query)}`);
-      const data = await response.json();
-
-      if (Array.isArray(data)) {
-        setAddressResults(
-          data.map((item) => ({
-            id: item.place_id,
-            fullAddress: item.display_name,
-            street:
-              item.address?.road ||
-              item.address?.pedestrian ||
-              item.address?.street ||
-              "",
-            town: item.address?.town || item.address?.city || item.address?.suburb || "",
-            postcode: item.address?.postcode || "",
-          }))
-        );
-        setShowAddressResults(true);
-      }
-    } catch (error) {
-      console.error("Address lookup failed:", error);
-      setAddressResults([]);
-    } finally {
-      setAddressLoading(false);
-    }
+  const fetchAddressSuggestions = useCallback(async (query) => {
+    if (query.length < 3) return [];
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001";
+    const response = await fetch(`${apiUrl}/api/address/lookup?q=${encodeURIComponent(query)}`);
+    const data = await response.json();
+    if (!Array.isArray(data)) return [];
+    return data.map((item) => ({
+      id: item.place_id,
+      fullAddress: item.display_name,
+      street:
+        item.address?.road ||
+        item.address?.pedestrian ||
+        item.address?.street ||
+        "",
+      town: item.address?.town || item.address?.city || item.address?.suburb || "",
+      postcode: item.address?.postcode || "",
+    }));
   }, []);
 
   const selectAddress = (address) => {
@@ -350,18 +346,29 @@ export default function HakaruRSAMembership() {
     setShowAddressResults(false);
   };
 
-  // Close dropdown on outside click
+  const selectPhysicalAddress = (address) => {
+    set("physicalAddress", address.street);
+    set("physicalTown", address.town);
+    set("physicalPostCode", address.postcode);
+    setPhysicalAddressSearch(address.fullAddress);
+    setPhysicalAddressResults([]);
+    setShowPhysicalAddressResults(false);
+  };
+
+  // Close dropdowns on outside click
   useEffect(() => {
+    if (!showAddressResults && !showPhysicalAddressResults) return undefined;
     const handleClickOutside = (e) => {
       if (!e.target.closest(".address-search-container")) {
         setShowAddressResults(false);
       }
+      if (!e.target.closest(".physical-address-search-container")) {
+        setShowPhysicalAddressResults(false);
+      }
     };
-    if (showAddressResults) {
-      document.addEventListener("click", handleClickOutside);
-      return () => document.removeEventListener("click", handleClickOutside);
-    }
-  }, [showAddressResults]);
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [showAddressResults, showPhysicalAddressResults]);
 
   // Debounce address search to avoid rate limiting
   useEffect(() => {
@@ -372,13 +379,73 @@ export default function HakaruRSAMembership() {
   }, [addressSearch]);
 
   useEffect(() => {
-    if (debouncedSearch) {
-      searchAddress(debouncedSearch);
-    } else {
+    const timer = setTimeout(() => {
+      setDebouncedPhysicalSearch(physicalAddressSearch);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [physicalAddressSearch]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const q = debouncedSearch;
+    if (!q || q.length < 3) {
       setAddressResults([]);
       setShowAddressResults(false);
+      setAddressLoading(false);
+      return undefined;
     }
-  }, [debouncedSearch, searchAddress]);
+    setAddressLoading(true);
+    fetchAddressSuggestions(q)
+      .then((results) => {
+        if (cancelled) return;
+        setAddressResults(results);
+        setShowAddressResults(results.length > 0);
+      })
+      .catch((err) => {
+        console.error("Address lookup failed:", err);
+        if (!cancelled) {
+          setAddressResults([]);
+          setShowAddressResults(false);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAddressLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedSearch, fetchAddressSuggestions]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const q = debouncedPhysicalSearch;
+    if (!q || q.length < 3) {
+      setPhysicalAddressResults([]);
+      setShowPhysicalAddressResults(false);
+      setPhysicalAddressLoading(false);
+      return undefined;
+    }
+    setPhysicalAddressLoading(true);
+    fetchAddressSuggestions(q)
+      .then((results) => {
+        if (cancelled) return;
+        setPhysicalAddressResults(results);
+        setShowPhysicalAddressResults(results.length > 0);
+      })
+      .catch((err) => {
+        console.error("Physical address lookup failed:", err);
+        if (!cancelled) {
+          setPhysicalAddressResults([]);
+          setShowPhysicalAddressResults(false);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPhysicalAddressLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedPhysicalSearch, fetchAddressSuggestions]);
 
   const isReturned = form.membershipType === "Returned & Service";
   const baseFee = MEMBERSHIP_FEES[form.membershipType] || 0;
@@ -396,6 +463,8 @@ export default function HakaruRSAMembership() {
       applicant_email: form.email || "",
     };
   }, [form.membershipType, form.email]);
+
+  const serviceYearOptions = useMemo(() => buildServiceYearList(), []);
 
   const handleStripePaid = useCallback(async (paymentIntent) => {
     const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -671,13 +740,45 @@ export default function HakaruRSAMembership() {
                 <span className="text-xs font-normal normal-case tracking-normal text-gray-500">(if different from mailing)</span>
               </p>
               <div className="space-y-4">
-                <div>
+                <div className="physical-address-search-container">
+                  <label className={labelClass}>Search Address</label>
+                  <div className="relative">
+                    <input
+                      className={inputClass}
+                      value={physicalAddressSearch}
+                      onChange={(e) => setPhysicalAddressSearch(e.target.value)}
+                      onFocus={() => physicalAddressResults.length > 0 && setShowPhysicalAddressResults(true)}
+                      placeholder="Start typing address to search..."
+                    />
+                    {physicalAddressLoading && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="w-5 h-5 border-2 border-rsa-navy border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                    {showPhysicalAddressResults && physicalAddressResults.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border-2 border-rsa-navy/30 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {physicalAddressResults.map((addr) => (
+                          <button
+                            key={addr.id}
+                            type="button"
+                            onClick={() => selectPhysicalAddress(addr)}
+                            className="w-full px-4 py-3 text-left text-sm hover:bg-rsa-gold/10 border-b border-gray-100 last:border-0 transition-colors"
+                          >
+                            <div className="font-bold text-rsa-navy">{addr.fullAddress}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Search by street name, town, or postcode</p>
+                </div>
+                <div className="relative">
                   <label className={labelClass}>Street Address</label>
                   <input
                     className={inputClass}
                     value={form.physicalAddress}
                     onChange={(e) => set("physicalAddress", e.target.value)}
-                    placeholder="Leave blank if same as mailing"
+                    placeholder="Or enter manually"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -861,11 +962,35 @@ export default function HakaruRSAMembership() {
                   </div>
                   <div>
                     <label className={labelClass}>Year Enlisted</label>
-                    <input className={inputClass} value={form.yearEnlisted} onChange={(e) => set("yearEnlisted", e.target.value)} placeholder="e.g. 1972" />
+                    <select
+                      className={inputClass}
+                      value={form.yearEnlisted}
+                      onChange={(e) => set("yearEnlisted", e.target.value)}
+                      aria-label="Year enlisted"
+                    >
+                      <option value="">Select year</option>
+                      {serviceYearOptions.map((y) => (
+                        <option key={y} value={String(y)}>
+                          {y}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className={labelClass}>Year Discharged</label>
-                    <input className={inputClass} value={form.yearDischarged} onChange={(e) => set("yearDischarged", e.target.value)} placeholder="e.g. 1985" />
+                    <select
+                      className={inputClass}
+                      value={form.yearDischarged}
+                      onChange={(e) => set("yearDischarged", e.target.value)}
+                      aria-label="Year discharged"
+                    >
+                      <option value="">Select year</option>
+                      {serviceYearOptions.map((y) => (
+                        <option key={y} value={String(y)}>
+                          {y}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 

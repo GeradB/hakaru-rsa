@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { siteContent } from '../content';
+import { useSiteContent } from '../context/SiteContentContext';
 
 export default function Header() {
+  const siteContent = useSiteContent();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 

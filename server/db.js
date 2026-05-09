@@ -5,6 +5,8 @@ dotenv.config();
 
 let pool = null;
 
+export const SITE_IMAGES_ALBUM_NAME = 'Site images';
+
 export const getPool = async () => {
   if (pool) return pool;
 
@@ -209,11 +211,23 @@ export const listPublishedGalleryItems = async (albumId = null) => {
     SELECT id, title, caption, blob_name, public_url, sort_order, is_published, created_at, updated_at, album_id
     FROM gallery_items
     WHERE is_published = 1
-    ${albumId ? 'AND album_id = @album_id' : ''}
+    ${
+      albumId
+        ? `AND album_id = @album_id
+           AND EXISTS (
+             SELECT 1
+             FROM gallery_albums a
+             WHERE a.id = @album_id
+               AND a.is_published = 1
+               AND a.name <> @site_images_album_name
+           )`
+        : ''
+    }
     ORDER BY sort_order ASC, created_at ASC
   `;
   const request = pool.request();
   if (albumId) request.input('album_id', sql.UniqueIdentifier, albumId);
+  if (albumId) request.input('site_images_album_name', sql.NVarChar(255), SITE_IMAGES_ALBUM_NAME);
   const result = await request.query(query);
   return result.recordset;
 };
@@ -235,12 +249,16 @@ export const listAllGalleryItems = async (albumId = null) => {
 // Album functions
 export const listPublishedAlbums = async () => {
   const pool = await getPool();
-  const result = await pool.request().query(`
-    SELECT id, name, description, sort_order, is_published, created_at, updated_at
-    FROM gallery_albums
-    WHERE is_published = 1
-    ORDER BY sort_order ASC, created_at ASC
-  `);
+  const result = await pool
+    .request()
+    .input('site_images_album_name', sql.NVarChar(255), SITE_IMAGES_ALBUM_NAME)
+    .query(`
+      SELECT id, name, description, sort_order, is_published, created_at, updated_at
+      FROM gallery_albums
+      WHERE is_published = 1
+        AND name <> @site_images_album_name
+      ORDER BY sort_order ASC, created_at ASC
+    `);
   return result.recordset;
 };
 
@@ -252,6 +270,44 @@ export const listAllAlbums = async () => {
     ORDER BY sort_order ASC, created_at ASC
   `);
   return result.recordset;
+};
+
+export const findAlbumByName = async (name) => {
+  const pool = await getPool();
+  const result = await pool
+    .request()
+    .input('name', sql.NVarChar(255), name)
+    .query(`
+      SELECT TOP 1 id, name, description, sort_order, is_published, created_at, updated_at
+      FROM gallery_albums
+      WHERE name = @name
+    `);
+  return result.recordset[0] || null;
+};
+
+export const getAlbumById = async (id) => {
+  const pool = await getPool();
+  const result = await pool
+    .request()
+    .input('id', sql.UniqueIdentifier, id)
+    .query(`
+      SELECT id, name, description, sort_order, is_published, created_at, updated_at
+      FROM gallery_albums
+      WHERE id = @id
+    `);
+  return result.recordset[0] || null;
+};
+
+export const ensureSiteImagesAlbum = async () => {
+  const existing = await findAlbumByName(SITE_IMAGES_ALBUM_NAME);
+  if (existing) return existing;
+  const id = await createAlbum({
+    name: SITE_IMAGES_ALBUM_NAME,
+    description: 'Internal images for site content (not shown on public gallery).',
+    sortOrder: -100,
+    isPublished: false,
+  });
+  return getAlbumById(id);
 };
 
 export const createAlbum = async (data) => {
@@ -568,4 +624,49 @@ export const updateDonation = async (id, formData, paymentData) => {
         updated_at = GETDATE()
       WHERE id = @id
     `);
+};
+
+// --- CMS site content patches ---
+export const listCmsPatches = async () => {
+  const pool = await getPool();
+  const result = await pool.request().query(`
+    SELECT slug, payload_json, updated_at
+    FROM cms_content_patches
+    ORDER BY slug
+  `);
+  return result.recordset.map((row) => ({
+    slug: row.slug,
+    payload: JSON.parse(row.payload_json || '{}'),
+    updatedAt: row.updated_at,
+  }));
+};
+
+export const upsertCmsPatch = async (slug, payloadObj) => {
+  const pool = await getPool();
+  const json = JSON.stringify(payloadObj);
+  const exists = await pool
+    .request()
+    .input('slug', sql.NVarChar(64), slug)
+    .query('SELECT 1 AS ok FROM cms_content_patches WHERE slug = @slug');
+
+  if (exists.recordset.length > 0) {
+    await pool
+      .request()
+      .input('slug', sql.NVarChar(64), slug)
+      .input('payload', sql.NVarChar(sql.MAX), json)
+      .query(`
+        UPDATE cms_content_patches
+        SET payload_json = @payload, updated_at = SYSUTCDATETIME()
+        WHERE slug = @slug
+      `);
+  } else {
+    await pool
+      .request()
+      .input('slug', sql.NVarChar(64), slug)
+      .input('payload', sql.NVarChar(sql.MAX), json)
+      .query(`
+        INSERT INTO cms_content_patches (slug, payload_json, updated_at)
+        VALUES (@slug, @payload, SYSUTCDATETIME())
+      `);
+  }
 };

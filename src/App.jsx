@@ -22,7 +22,9 @@ import Projects from './pages/Projects';
 import Gallery from './pages/Gallery';
 import AdminLogin from './pages/AdminLogin';
 import AdminGallery from './pages/AdminGallery';
+import AdminSiteContent from './pages/AdminSiteContent';
 import Donation from './pages/Donation';
+import { SiteContentProvider } from './context/SiteContentContext';
 
 // Scroll to top on route change
 function ScrollToTopOnRouteChange() {
@@ -78,6 +80,7 @@ function AppContent() {
     <Routes>
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin/gallery" element={<AdminGallery />} />
+      <Route path="/admin/site-content" element={<AdminSiteContent />} />
       <Route path="/membership/become" element={<MembershipBecomeStandalone />} />
       <Route path="/membership/become/" element={<MembershipBecomeStandalone />} />
       <Route path="/renew" element={<MembershipBecomeStandalone />} />
@@ -102,8 +105,10 @@ function AppContent() {
 function App() {
   return (
     <Router>
-      <ScrollToTopOnRouteChange />
-      <AppContent />
+      <SiteContentProvider>
+        <ScrollToTopOnRouteChange />
+        <AppContent />
+      </SiteContentProvider>
     </Router>
   );
 }

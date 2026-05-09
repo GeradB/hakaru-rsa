@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
-import { siteContent } from '../content';
+import { useSiteContent } from '../context/SiteContentContext';
 
 export default function Footer() {
+  const siteContent = useSiteContent();
   const { footer, contact } = siteContent;
 
   return (

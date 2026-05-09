@@ -1,50 +1,10 @@
 import { Link } from 'react-router-dom';
+import { useSiteContent } from '../context/SiteContentContext';
 
 export default function Projects() {
-  const projects = [
-    {
-      id: 1,
-      title: "ANZAC Day Commemoration",
-      description: "Our annual ANZAC Day service honors the brave men and women who served and sacrificed. The service includes a dawn ceremony, wreath laying, and community breakfast.",
-      status: "annual",
-      emoji: "🌅",
-    },
-    {
-      id: 2,
-      title: "Poppy Day Appeal",
-      description: "Supporting the RSA Poppy Day appeal to raise funds for veteran welfare services. Volunteers collect donations at local shopping centers.",
-      status: "annual",
-      emoji: "🌺",
-    },
-    {
-      id: 3,
-      title: "Veterans Support Program",
-      description: "Ongoing support for local veterans including welfare checks, transport to medical appointments, and assistance with accessing government services.",
-      status: "ongoing",
-      emoji: "🤝",
-    },
-    {
-      id: 4,
-      title: "Community Breakfast Club",
-      description: "Monthly community breakfast bringing together veterans, families, and local residents to foster connection and combat isolation.",
-      status: "ongoing",
-      emoji: "🍳",
-    },
-    {
-      id: 5,
-      title: "Youth Leadership Program",
-      description: "Supporting local youth through leadership development, mentoring, and scholarships for students interested in military or public service careers.",
-      status: "planning",
-      emoji: "🎓",
-    },
-    {
-      id: 6,
-      title: "Memorial Garden Maintenance",
-      description: "Upkeep and beautification of the RSA memorial garden, ensuring our fallen comrades are honored with a beautiful, peaceful space.",
-      status: "ongoing",
-      emoji: "🌻",
-    },
-  ];
+  const siteContent = useSiteContent();
+  const pp = siteContent.projectsPage || {};
+  const projects = pp.items || [];
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -64,60 +24,72 @@ export default function Projects() {
     }
   };
 
+  const missionImg = pp.missionImageUrl?.trim?.();
+
   return (
     <div className="bg-gradient-to-b from-rsa-navy via-slate-800 to-rsa-navy min-h-screen py-16">
       <div className="max-w-6xl mx-auto px-4">
         <h1 className="text-3xl md:text-5xl font-bold font-heading text-white mb-4 text-center leading-tight">
-          Community Projects
+          {pp.pageTitle || 'Community Projects'}
         </h1>
         <p className="text-lg md:text-xl text-gray-300 text-center mb-12 max-w-2xl mx-auto">
-          Making a difference in Hakaru and beyond
+          {pp.pageSubtitle || 'Making a difference in Hakaru and beyond'}
         </p>
 
-        {/* Mission Statement */}
-        <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl p-8 mb-12 text-center">
-          <h2 className="text-2xl font-bold font-heading text-rsa-navy mb-4">
-            Our Commitment to Community
-          </h2>
-          <p className="text-gray-700 leading-relaxed max-w-3xl mx-auto">
-            The Hakaru & Districts RSA is dedicated to serving our veterans, supporting our community,
-            and preserving the ANZAC spirit. Through our various projects and initiatives, we strive
-            to make a positive impact on the lives of those who have served and their families.
-          </p>
+        <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl overflow-hidden mb-12 text-center">
+          {missionImg ? (
+            <img src={missionImg} alt="" className="w-full max-h-64 object-cover" />
+          ) : null}
+          <div className="p-8">
+            <h2 className="text-2xl font-bold font-heading text-rsa-navy mb-4">
+              {pp.missionTitle || 'Our Commitment to Community'}
+            </h2>
+            <p className="text-gray-700 leading-relaxed max-w-3xl mx-auto">
+              {pp.missionBody ||
+                'The Hakaru & Districts RSA is dedicated to serving our veterans and community.'}
+            </p>
+          </div>
         </div>
 
-        {/* Projects Grid */}
         <h2 className="text-2xl font-bold font-heading text-white mb-6">Current Projects</h2>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
           {projects.map((project) => (
             <div
               key={project.id}
-              className="bg-white/95 backdrop-blur rounded-xl shadow-xl p-6 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
+              className="bg-white/95 backdrop-blur rounded-xl shadow-xl overflow-hidden hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
             >
-              <div className="flex items-start justify-between mb-4">
-                <span className="text-4xl" aria-hidden="true">{project.emoji}</span>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(project.status)}`}>
-                  {getStatusLabel(project.status)}
-                </span>
+              {project.imageUrl?.trim?.() ? (
+                <img
+                  src={project.imageUrl.trim()}
+                  alt=""
+                  className="h-40 w-full object-cover"
+                />
+              ) : null}
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <span className="text-4xl" aria-hidden="true">{project.emoji}</span>
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(project.status)}`}>
+                    {getStatusLabel(project.status)}
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold font-heading text-rsa-navy mb-3">
+                  {project.title}
+                </h3>
+                <p className="text-gray-700 leading-relaxed">
+                  {project.description}
+                </p>
               </div>
-              <h3 className="text-xl font-bold font-heading text-rsa-navy mb-3">
-                {project.title}
-              </h3>
-              <p className="text-gray-700 leading-relaxed">
-                {project.description}
-              </p>
             </div>
           ))}
         </div>
 
-        {/* Get Involved Section */}
         <div className="bg-rsa-gold rounded-2xl shadow-2xl p-8 md:p-12 text-center">
           <h2 className="text-2xl md:text-3xl font-bold font-heading text-rsa-navy mb-4">
-            Get Involved
+            {pp.getInvolvedTitle || 'Get Involved'}
           </h2>
           <p className="text-rsa-navy/80 mb-8 max-w-xl mx-auto leading-relaxed">
-            We welcome volunteers and supporters for all our projects. Whether you can donate time,
-            resources, or simply spread the word, your contribution makes a difference.
+            {pp.getInvolvedBody ||
+              'We welcome volunteers and supporters for all our projects.'}
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link
@@ -138,38 +110,23 @@ export default function Projects() {
           </div>
         </div>
 
-        {/* Past Projects */}
         <div className="mt-16">
-          <h2 className="text-2xl font-bold font-heading text-white mb-6">Past Initiatives</h2>
+          <h2 className="text-2xl font-bold font-heading text-white mb-6">
+            {pp.pastInitiativesTitle || 'Past Initiatives'}
+          </h2>
           <div className="bg-white/95 backdrop-blur rounded-2xl shadow-xl p-8">
             <ul className="space-y-4">
-              <li className="flex items-start">
-                <svg className="w-6 h-6 text-rsa-gold mr-3 mt-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <div>
-                  <span className="font-bold text-rsa-navy">2024 Community Christmas Party</span>
-                  <p className="text-gray-600 text-sm">Provided Christmas celebrations for 150+ veterans and families</p>
-                </div>
-              </li>
-              <li className="flex items-start">
-                <svg className="w-6 h-6 text-rsa-gold mr-3 mt-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <div>
-                  <span className="font-bold text-rsa-navy">Memorial Plaque Installation</span>
-                  <p className="text-gray-600 text-sm">New memorial plaques honoring local service members</p>
-                </div>
-              </li>
-              <li className="flex items-start">
-                <svg className="w-6 h-6 text-rsa-gold mr-3 mt-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <div>
-                  <span className="font-bold text-rsa-navy">Clubhouse Renovation</span>
-                  <p className="text-gray-600 text-sm">Upgraded facilities to better serve our members and community</p>
-                </div>
-              </li>
+              {(pp.pastInitiatives || []).map((item, i) => (
+                <li key={i} className="flex items-start">
+                  <svg className="w-6 h-6 text-rsa-gold mr-3 mt-1 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <div>
+                    <span className="font-bold text-rsa-navy">{item.title}</span>
+                    <p className="text-gray-600 text-sm">{item.description}</p>
+                  </div>
+                </li>
+              ))}
             </ul>
           </div>
         </div>

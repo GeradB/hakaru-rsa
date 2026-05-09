@@ -1,25 +1,27 @@
-import { siteContent } from '../content';
+import { useSiteContent } from '../context/SiteContentContext';
 
 export default function Events() {
-  const { upcomingEvents } = siteContent;
+  const siteContent = useSiteContent();
+  const { upcomingEvents, eventsPage } = siteContent;
+  const ep = eventsPage || {};
 
   return (
     <div className="py-16 md:py-24 bg-gradient-to-b from-rsa-navy via-slate-800 to-rsa-navy min-h-screen">
       <div className="max-w-5xl mx-auto px-4">
         <h1 className="text-3xl md:text-5xl font-bold font-heading text-white mb-4 text-center leading-tight">
-          Events & Entertainment
+          {ep.title || 'Events & Entertainment'}
         </h1>
         <p className="text-lg md:text-xl text-gray-300 text-center mb-12 max-w-2xl mx-auto">
-          Regular events for members and the community
+          {ep.subtitle || 'Regular events for members and the community'}
         </p>
 
         {/* Weekly Events */}
         <div className="mb-12">
           <h2 className="text-2xl md:text-3xl font-bold font-heading text-white mb-8">
-            Weekly Events
+            {ep.weeklyHeading || 'Weekly Events'}
           </h2>
           <div className="grid md:grid-cols-2 gap-6">
-            {upcomingEvents.events.map((event) => (
+            {(upcomingEvents?.events || []).map((event) => (
               <div
                 key={event.id}
                 className="bg-white/95 backdrop-blur rounded-xl shadow-xl p-6 border-l-4 border-rsa-gold hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
@@ -40,17 +42,17 @@ export default function Events() {
           </div>
         </div>
 
-        {/* Special Events Placeholder */}
         <div className="bg-white/95 backdrop-blur rounded-xl shadow-xl p-8 md:p-12 text-center">
           <h2 className="text-2xl md:text-3xl font-bold font-heading text-rsa-navy mb-4">
-            Special Events
+            {ep.specialHeading || 'Special Events'}
           </h2>
           <p className="text-gray-700 mb-4 leading-relaxed">
-            Keep an eye out for our special events including ANZAC Day commemorations,
-            Poppy Day appeals, and seasonal celebrations.
+            {ep.specialBody ||
+              'Keep an eye out for our special events including ANZAC Day commemorations, Poppy Day appeals, and seasonal celebrations.'}
           </p>
           <p className="text-gray-600 text-sm">
-            Check back here or follow our social media for upcoming special event announcements.
+            {ep.specialFooter ||
+              'Check back here or follow our social media for upcoming special event announcements.'}
           </p>
         </div>
       </div>

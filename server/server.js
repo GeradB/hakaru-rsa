@@ -8,6 +8,13 @@ import cookieParser from 'cookie-parser';
 import multer from 'multer';
 import bcrypt from 'bcryptjs';
 import Stripe from 'stripe';
+import { jwtDecode } from 'jwt-decode';
+import https from 'https';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import {
   createMembership,
   updateMembership,
@@ -24,11 +31,23 @@ import {
   updateDonation,
   listPublishedAlbums,
   listAllAlbums,
+  ensureSiteImagesAlbum,
+  SITE_IMAGES_ALBUM_NAME,
+  getAlbumById,
   createAlbum,
   updateAlbum,
   deleteAlbum,
+  listCmsPatches,
+  upsertCmsPatch,
 } from './db.js';
 import { uploadGalleryImage, deleteGalleryBlob, isAzureGalleryConfigured } from './galleryBlob.js';
+import {
+  mergeSiteContentPatches,
+  pickFragment,
+  fragmentKeysValid,
+  CMS_SLUGS,
+  getDefaultSiteContent,
+} from './cmsMerge.js';
 
 dotenv.config();
 
@@ -134,7 +153,41 @@ const checkLoginRateLimit = (ip) => {
   return true;
 };
 
-const requireAdmin = (req, res, next) => {
+const requireAdmin = async (req, res, next) => {
+  // Check for Entra ID Bearer token first
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const idToken = authHeader.substring(7);
+    try {
+      // Decode and validate the Entra ID token
+      const decoded = jwtDecode(idToken);
+
+      // Verify token is from our tenant
+      const expectedTenantId = '0f9e3c4e-92b5-4caf-ae9a-56a7e71882a8';
+
+      if (decoded.tid !== expectedTenantId) {
+        return res.status(401).json({ error: 'Invalid token tenant' });
+      }
+
+      // Check token expiration
+      if (decoded.exp && Date.now() > decoded.exp * 1000) {
+        return res.status(401).json({ error: 'Token expired' });
+      }
+
+      // Token is valid, attach user info to request
+      req.user = {
+        email: decoded.email || decoded.preferred_username,
+        name: decoded.name,
+        oid: decoded.oid,
+      };
+      return next();
+    } catch (err) {
+      console.error('Token validation error:', err);
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+  }
+
+  // Fallback to username/password session
   if (!adminAuthConfigured()) {
     return res.status(503).json({ error: 'Admin authentication is not configured' });
   }
@@ -787,6 +840,7 @@ app.get('/api/admin/albums', requireAdmin, async (_req, res) => {
     return res.status(503).json({ error: 'Database is not configured' });
   }
   try {
+    await ensureSiteImagesAlbum();
     const albums = await listAllAlbums();
     res.json({ albums: albums.map(a => ({ ...a, id: a.id.toString ? a.id.toString() : a.id })) });
   } catch (error) {
@@ -805,6 +859,11 @@ app.post('/api/admin/albums', requireAdmin, async (req, res) => {
     if (!name) {
       return res.status(400).json({ error: 'Album name is required' });
     }
+    if (String(name).trim().toLowerCase() === SITE_IMAGES_ALBUM_NAME.toLowerCase()) {
+      // Reserved internal album: create if missing, never public
+      const album = await ensureSiteImagesAlbum();
+      return res.status(201).json({ success: true, id: album.id.toString ? album.id.toString() : album.id });
+    }
     const id = await createAlbum({ name, description, sortOrder, isPublished });
     res.status(201).json({ success: true, id: id.toString ? id.toString() : id });
   } catch (error) {
@@ -821,6 +880,18 @@ app.put('/api/admin/albums/:id', requireAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     const { name, description, sortOrder, isPublished } = req.body || {};
+    const existing = await getAlbumById(id);
+    if (!existing) return res.status(404).json({ error: 'Album not found' });
+    if (String(existing.name).toLowerCase() === SITE_IMAGES_ALBUM_NAME.toLowerCase()) {
+      // Internal album: allow metadata edits but never publish/rename.
+      await updateAlbum(id, {
+        name: SITE_IMAGES_ALBUM_NAME,
+        description: description ?? existing.description,
+        sortOrder: sortOrder ?? existing.sort_order ?? 0,
+        isPublished: false,
+      });
+      return res.json({ success: true });
+    }
     await updateAlbum(id, { name, description, sortOrder, isPublished });
     res.json({ success: true });
   } catch (error) {
@@ -836,6 +907,13 @@ app.delete('/api/admin/albums/:id', requireAdmin, async (req, res) => {
   }
   const { id } = req.params;
   try {
+    const existing = await getAlbumById(id);
+    if (!existing) {
+      return res.status(404).json({ error: 'Album not found' });
+    }
+    if (String(existing.name).toLowerCase() === SITE_IMAGES_ALBUM_NAME.toLowerCase()) {
+      return res.status(403).json({ error: 'This album is reserved for site images and cannot be deleted.' });
+    }
     const deletedId = await deleteAlbum(id);
     if (!deletedId) {
       return res.status(404).json({ error: 'Album not found' });
@@ -890,6 +968,114 @@ app.get('/api/admin/gallery/album/:albumId', requireAdmin, async (req, res) => {
     res.status(500).json({ error: 'Failed to list gallery items' });
   }
 });
+
+async function getMergedSiteContentSafe() {
+  if (!dbConfigured) {
+    return getDefaultSiteContent();
+  }
+  try {
+    const patches = await listCmsPatches();
+    return mergeSiteContentPatches(patches);
+  } catch (err) {
+    console.error('Site content CMS load failed:', err.message || err);
+    return getDefaultSiteContent();
+  }
+}
+
+// --- Public CMS (merged defaults + DB patches) ---
+app.get('/api/site-content', async (_req, res) => {
+  try {
+    const merged = await getMergedSiteContentSafe();
+    res.json(merged);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to load site content' });
+  }
+});
+
+// --- Admin CMS ---
+app.get('/api/admin/site-content/slugs', requireAdmin, (_req, res) => {
+  res.json({ slugs: [...CMS_SLUGS] });
+});
+
+app.get('/api/admin/site-content/:slug', requireAdmin, async (req, res) => {
+  const { slug } = req.params;
+  if (!CMS_SLUGS.includes(slug)) {
+    return res.status(400).json({ error: 'Unknown slug' });
+  }
+  try {
+    const merged = await getMergedSiteContentSafe();
+    const fragment = pickFragment(slug, merged);
+    res.json({ slug, fragment });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to load content fragment' });
+  }
+});
+
+app.put('/api/admin/site-content/:slug', requireAdmin, async (req, res) => {
+  if (!dbConfigured) {
+    return res.status(503).json({ error: 'Database is not configured' });
+  }
+  const { slug } = req.params;
+  if (!CMS_SLUGS.includes(slug)) {
+    return res.status(400).json({ error: 'Unknown slug' });
+  }
+  const payload = req.body?.payload ?? req.body;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return res.status(400).json({ error: 'Body must be a JSON object (or { payload })' });
+  }
+  if (!fragmentKeysValid(slug, payload)) {
+    return res.status(400).json({ error: 'Payload contains invalid keys for this slug' });
+  }
+  try {
+    await upsertCmsPatch(slug, payload);
+    const merged = await getMergedSiteContentSafe();
+    res.json({
+      success: true,
+      fragment: pickFragment(slug, merged),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to save content' });
+  }
+});
+
+const MAX_CMS_UPLOAD_BYTES = 10 * 1024 * 1024;
+const cmsUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_CMS_UPLOAD_BYTES },
+});
+
+app.post(
+  '/api/admin/site-content/upload',
+  requireAdmin,
+  cmsUpload.single('image'),
+  async (req, res) => {
+    if (!isAzureGalleryConfigured()) {
+      return res.status(503).json({ error: 'Azure Blob Storage is not configured' });
+    }
+    const file = req.file;
+    if (!file || !file.buffer?.length) {
+      return res.status(400).json({ error: 'Missing image file (field name: image)' });
+    }
+    const kind = detectImageType(file.buffer);
+    if (!kind) {
+      return res.status(400).json({ error: 'Invalid format (JPEG, PNG, WebP only)' });
+    }
+    const now = new Date();
+    const y = now.getUTCFullYear();
+    const m = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const blobName = `cms/${y}/${m}/${crypto.randomUUID()}.${kind.ext}`;
+    try {
+      const publicUrl = await uploadGalleryImage(file.buffer, blobName, kind.mime);
+      res.status(201).json({ success: true, publicUrl, blobName });
+    } catch (err) {
+      console.error('CMS image upload:', err);
+      res.status(500).json({ error: 'Upload failed' });
+    }
+  },
+);
 
 // GET /api/address/lookup
 // Proxy NZ address lookup to avoid CORS and rate limiting
@@ -948,7 +1134,28 @@ app.get('/api/address/lookup', async (req, res) => {
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+const HTTP_PORT = process.env.PORT || 3001;
+const HTTPS_PORT = parseInt(HTTP_PORT) + 1 || 3002;
+
+// Start HTTP server
+app.listen(HTTP_PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${HTTP_PORT}`);
   console.log(`Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
 });
+
+// Start HTTPS server for local development with MSAL
+const HTTPS_ENABLED = process.env.HTTPS_ENABLED === 'true';
+if (HTTPS_ENABLED) {
+  try {
+    const certDir = path.resolve(__dirname, '../certs');
+    const httpsOptions = {
+      key: fs.readFileSync(path.join(certDir, 'key.pem')),
+      cert: fs.readFileSync(path.join(certDir, 'cert.pem')),
+    };
+    https.createServer(httpsOptions, app).listen(HTTPS_PORT, '0.0.0.0', () => {
+      console.log(`HTTPS server running on port ${HTTPS_PORT}`);
+    });
+  } catch (err) {
+    console.error('Failed to start HTTPS server:', err.message);
+  }
+}

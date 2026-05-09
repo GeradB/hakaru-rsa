@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
-import { siteContent } from '../content';
+import { useSiteContent } from '../context/SiteContentContext';
 
 export default function Membership() {
+  const siteContent = useSiteContent();
   const { membership } = siteContent;
 
   return (
@@ -16,7 +17,7 @@ export default function Membership() {
 
         {/* Membership Types */}
         <div className="grid md:grid-cols-2 gap-8 mb-12">
-          {membership.types.map((type, index) => (
+          {(membership.types || []).map((type, index) => (
             <div
               key={type.name}
               className={`rounded-2xl shadow-2xl p-8 border-t-4 ${
@@ -37,7 +38,7 @@ export default function Membership() {
                 {type.description}
               </p>
               <ul className="space-y-3">
-                {type.benefits.map((benefit, idx) => (
+                {(type.benefits || []).map((benefit, idx) => (
                   <li key={idx} className="flex items-start">
                     <svg className={`w-5 h-5 mr-3 mt-0.5 flex-shrink-0 ${
                       index === 0 ? 'text-rsa-gold' : 'text-rsa-gold'
@@ -62,7 +63,7 @@ export default function Membership() {
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/membership/become"
+              to={membership.applyLink || '/membership/become'}
               className="inline-flex items-center justify-center bg-rsa-gold text-rsa-navy px-8 py-4 rounded-lg font-bold text-lg hover:bg-yellow-400 transition-all hover:scale-105 focus:ring-4 focus:ring-rsa-gold/50"
             >
               Become a Member
