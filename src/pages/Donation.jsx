@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { apiUrl } from '../apiBase';
+import { apiUrl, fetchApiJson } from '../apiBase';
 import { getStripe } from '../lib/stripe';
 import { useSiteContent } from '../context/SiteContentContext';
 
@@ -33,9 +33,8 @@ function StripePaymentInner({ amount, timing, interval, donorType, isAnonymous, 
 
     try {
       // First, submit donation data to get a donation ID
-      const submitRes = await fetch(apiUrl('/api/donation/submit'), {
+      const submitResult = await fetchApiJson('/api/donation/submit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           formData: {
@@ -49,8 +48,6 @@ function StripePaymentInner({ amount, timing, interval, donorType, isAnonymous, 
         }),
       });
 
-      const submitResult = await submitRes.json();
-
       if (!submitResult.success) {
         throw new Error(submitResult.error || 'Failed to submit donation');
       }
@@ -58,9 +55,8 @@ function StripePaymentInner({ amount, timing, interval, donorType, isAnonymous, 
       const donationId = submitResult.donationId;
 
       // Create payment intent
-      const paymentRes = await fetch(apiUrl('/api/stripe/create-payment-intent'), {
+      const paymentResult = await fetchApiJson('/api/stripe/create-payment-intent', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           amountNzd: amount,
@@ -69,8 +65,6 @@ function StripePaymentInner({ amount, timing, interval, donorType, isAnonymous, 
           metadata: { donationId, type: 'donation' },
         }),
       });
-
-      const paymentResult = await paymentRes.json();
 
       if (!paymentResult.success) {
         throw new Error(paymentResult.error || 'Failed to create payment');
@@ -90,9 +84,8 @@ function StripePaymentInner({ amount, timing, interval, donorType, isAnonymous, 
       }
 
       // Update donation with payment info
-      const updateRes = await fetch(apiUrl('/api/donation/update-payment'), {
+      await fetchApiJson('/api/donation/update-payment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           donationId,
@@ -109,12 +102,6 @@ function StripePaymentInner({ amount, timing, interval, donorType, isAnonymous, 
           },
         }),
       });
-
-      const updateResult = await updateRes.json();
-
-      if (!updateResult.success) {
-        console.error('Failed to update donation payment:', updateResult.error);
-      }
 
       onSuccess({ donationId, paymentIntentId: paymentResult.paymentIntentId });
     } catch (err) {
@@ -165,9 +152,8 @@ function StripePaymentSection({ amount, timing, interval, donorType, isAnonymous
     setIsLoading(true);
     setLoadError(null);
     try {
-      const res = await fetch(apiUrl('/api/stripe/create-payment-intent'), {
+      const result = await fetchApiJson('/api/stripe/create-payment-intent', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           amountNzd: amount,
@@ -176,8 +162,6 @@ function StripePaymentSection({ amount, timing, interval, donorType, isAnonymous
           metadata: { type: 'donation' },
         }),
       });
-
-      const result = await res.json();
 
       if (result.success) {
         setClientSecret(result.clientSecret);

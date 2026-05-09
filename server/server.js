@@ -233,6 +233,26 @@ const upload = multer({
   limits: { fileSize: MAX_GALLERY_UPLOAD_BYTES },
 });
 
+/**
+ * From: must match SMTP auth user unless Exchange "Send As" is granted for EMAIL_FROM.
+ * If EMAIL_FROM differs from EMAIL_USER, we use EMAIL_USER unless EMAIL_FROM_TRUST_SEND_AS=true.
+ */
+const resolveEmailFrom = () => {
+  const from = process.env.EMAIL_FROM?.trim();
+  const user = process.env.EMAIL_USER?.trim();
+  const trustSendAs = process.env.EMAIL_FROM_TRUST_SEND_AS === 'true';
+
+  if (!user) return from || '';
+  if (!from || from.toLowerCase() === user.toLowerCase()) return user;
+  if (trustSendAs) return from;
+
+  console.warn(
+    `[email] EMAIL_FROM (${from}) ≠ EMAIL_USER (${user}); sending as ${user} to avoid SendAsDenied (554). ` +
+      'Create a shared mailbox + Send As, or set EMAIL_FROM_TRUST_SEND_AS=true after granting Send As.',
+  );
+  return user;
+};
+
 // Email transporter setup - Office 365 / Microsoft 365 SMTP
 const createTransporter = () => {
   return nodemailer.createTransport({
@@ -253,18 +273,30 @@ const createTransporter = () => {
 
 // Helper to send emails with error handling
 const sendEmail = async (to, subject, html) => {
+  const toNorm = typeof to === 'string' ? to.trim() : '';
+  if (!toNorm || !toNorm.includes('@')) {
+    console.error(`[email] skip send: invalid or missing recipient (${JSON.stringify(to)})`);
+    return false;
+  }
+
   try {
+    const fromAddr = resolveEmailFrom();
+    const smtpHost = process.env.EMAIL_HOST || 'smtp.office365.com';
     const transporter = createTransporter();
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM,
-      to,
+    const info = await transporter.sendMail({
+      from: fromAddr,
+      to: toNorm,
       subject,
       html,
     });
-    console.log(`Email sent to ${to}: ${subject}`);
+    // SMTP 250 = accepted by this server; M365 message trace is in the tenant of EMAIL_USER.
+    console.log(
+      `[email] accepted by ${smtpHost} from=${fromAddr} to=${toNorm} messageId=${info.messageId || 'n/a'}`,
+    );
+    if (info.response) console.log(`[email] smtp last response: ${info.response}`);
     return true;
   } catch (error) {
-    console.error(`Failed to send email to ${to}:`, error.message);
+    console.error(`Failed to send email to ${toNorm}:`, error.message);
     return false;
   }
 };
@@ -607,8 +639,7 @@ app.post('/api/renewal/submit', async (req, res) => {
   }
 });
 
-// POST /api/renewal/update-payment
-// Update renewal with payment information and all form data
+// POST /api/renewal/update-payment — single handler (duplicate routes skipped email send)
 app.post('/api/renewal/update-payment', async (req, res) => {
   try {
     const { renewalId, paymentIntentId, status, amount, formData, fee, donation } = req.body;
@@ -630,6 +661,15 @@ app.post('/api/renewal/update-payment', async (req, res) => {
     if (dbConfigured) {
       await updateRenewal(renewalId, formData || {}, paymentData);
       console.log(`Renewal ${renewalId} updated with payment: ${status}`);
+
+      // Applicant copy uses formData.email from the renewal form (client sends formData: form)
+      if (status === 'succeeded') {
+        const txnRef = paymentIntentId || renewalId;
+        await sendRenewalEmails(
+          { ...(formData || {}), fee, donation, total: paymentData.total },
+          txnRef,
+        );
+      }
     }
 
     res.json({ success: true });
@@ -639,41 +679,21 @@ app.post('/api/renewal/update-payment', async (req, res) => {
   }
 });
 
-// POST /api/renewal/update-payment
-// Update renewal with payment information and all form data
-app.post('/api/renewal/update-payment', async (req, res) => {
+// POST /api/donation/submit — persists donor form (incl. email) before Stripe; client sends formData: { ...donorData }
+app.post('/api/donation/submit', async (req, res) => {
   try {
-    const { renewalId, paymentIntentId, status, amount, formData, fee, donation } = req.body;
-
-    if (!renewalId) {
-      return res.status(400).json({ error: 'Missing renewalId' });
+    const { formData } = req.body;
+    if (!formData) {
+      return res.status(400).json({ error: 'Missing formData' });
     }
-
-    const paymentData = {
-      stripePaymentIntentId: paymentIntentId,
-      paymentStatus: status,
-      amountPaid: amount,
-      fee,
-      total: donation ? (fee || 0) + (parseFloat(donation) || 0) : (fee || 0),
-      paidAt: status === 'succeeded' ? new Date().toISOString() : null,
-      status: status === 'succeeded' ? 'paid' : status,
-    };
-
-    if (dbConfigured) {
-      await updateRenewal(renewalId, formData || {}, paymentData);
-      console.log(`Renewal ${renewalId} updated with payment: ${status}`);
-
-      // Send emails on successful payment
-      if (status === 'succeeded') {
-        const txnRef = paymentIntentId || renewalId;
-        await sendRenewalEmails({ ...formData, fee, donation, total: paymentData.total }, txnRef);
-      }
+    if (!dbConfigured) {
+      return res.status(503).json({ error: 'Database is not configured' });
     }
-
-    res.json({ success: true });
+    const donationId = await createDonation(formData);
+    res.json({ success: true, donationId });
   } catch (error) {
-    console.error('Error updating payment:', error);
-    res.status(500).json({ error: 'Failed to update payment information' });
+    console.error('Error creating donation:', error);
+    res.status(500).json({ error: 'Failed to create donation' });
   }
 });
 
