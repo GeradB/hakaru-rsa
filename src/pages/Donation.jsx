@@ -369,47 +369,52 @@ export default function Donation() {
 
   if (donationSuccess) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-12">
-        <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
-          <h2 className="text-2xl font-bold text-green-800 mb-4">
-            {donatePage.successTitle || 'Thank You for Your Donation!'}
-          </h2>
-          <p className="text-green-700 mb-6">
-            {donatePage.successBody ||
-              'Your generous donation has been received. A confirmation email will be sent shortly.'}
-          </p>
-          <p className="text-green-600 text-sm">
-            {donatePage.successFootnote || 'Transaction reference has been recorded.'}
-          </p>
-          <a
-            href="/donate"
-            className="inline-block mt-4 text-rsa-navy underline font-semibold"
-          >
-            Make another donation
-          </a>
+      <div className="bg-gradient-to-b from-rsa-navy via-slate-800 to-rsa-navy min-h-screen py-16">
+        <div className="max-w-2xl mx-auto px-4">
+          <div className="bg-green-50 border border-green-200 rounded-2xl shadow-2xl p-8 text-center">
+            <h2 className="text-2xl font-bold text-green-800 mb-4">
+              {donatePage.successTitle || 'Thank You for Your Donation!'}
+            </h2>
+            <p className="text-green-700 mb-6">
+              {donatePage.successBody ||
+                'Your generous donation has been received. A confirmation email will be sent shortly.'}
+            </p>
+            <p className="text-green-600 text-sm">
+              {donatePage.successFootnote || 'Transaction reference has been recorded.'}
+            </p>
+            <a
+              href="/donate"
+              className="inline-block mt-4 text-rsa-navy underline font-semibold"
+            >
+              Make another donation
+            </a>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-12">
-      <h1 className="text-3xl font-bold text-rsa-navy mb-2">
-        {donatePage.title || 'Make a Donation'}
-      </h1>
-      <p className="text-gray-600 mb-8">
-        {donatePage.intro ||
-          'Support Hakaru & Districts RSA with a donation. Your contribution helps us continue our mission.'}
-      </p>
-      {donatePage.imageUrl?.trim?.() ? (
-        <img
-          src={donatePage.imageUrl.trim()}
-          alt=""
-          className="mb-8 w-full max-h-56 rounded-lg object-cover shadow-md"
-        />
-      ) : null}
+    <div className="bg-gradient-to-b from-rsa-navy via-slate-800 to-rsa-navy min-h-screen py-16">
+      <div className="max-w-3xl mx-auto px-4 space-y-8">
+        <div className="text-center">
+          <h1 className="text-3xl md:text-5xl font-bold font-heading text-white mb-4">
+            {donatePage.title || 'Make a Donation'}
+          </h1>
+          <p className="text-lg text-gray-300">
+            {donatePage.intro ||
+              'Support Hakaru & Districts RSA with a donation. Your contribution helps us continue our mission.'}
+          </p>
+        </div>
+        {donatePage.imageUrl?.trim?.() ? (
+          <img
+            src={donatePage.imageUrl.trim()}
+            alt=""
+            className="w-full max-h-56 rounded-2xl object-cover shadow-2xl border border-white/10"
+          />
+        ) : null}
 
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl p-6 md:p-8">
         <h2 className="text-xl font-semibold text-rsa-navy mb-4">Donation Amount</h2>
 
         <div className="grid grid-cols-3 gap-4 mb-4">
@@ -540,7 +545,7 @@ export default function Donation() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl p-6 md:p-8">
         <h2 className="text-xl font-semibold font-heading text-rsa-navy mb-4">
           {donorType === 'me' ? 'Your Details' : 'Organisation Details'}
         </h2>
@@ -720,13 +725,14 @@ export default function Donation() {
 
       {!showPayment ? (
         <button
+          type="button"
           onClick={() => setShowPayment(true)}
-          className="w-full bg-rsa-gold text-rsa-navy py-4 px-6 rounded-md font-bold text-lg hover:bg-rsa-gold/90 transition-colors"
+          className="w-full bg-rsa-gold text-rsa-navy py-4 px-6 rounded-lg font-bold text-lg hover:bg-rsa-gold/90 transition-colors shadow-lg"
         >
           Donate ${amount.toFixed(2)} {timing === 'recurring' ? `(${interval})` : ''}
         </button>
       ) : (
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl p-6 md:p-8">
           <h2 className="text-xl font-semibold text-rsa-navy mb-4">Payment Details</h2>
           <div className="mb-4 p-4 bg-gray-50 rounded-md">
             <p className="text-sm text-gray-600">
@@ -764,12 +770,13 @@ export default function Donation() {
           <button
             type="button"
             onClick={() => setShowPayment(false)}
-            className="mt-4 text-gray-600 underline text-sm"
+            className="mt-4 text-rsa-navy/80 hover:text-rsa-navy underline text-sm font-medium"
           >
             Back to details
           </button>
         </div>
       )}
+      </div>
     </div>
   );
 }
