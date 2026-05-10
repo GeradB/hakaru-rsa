@@ -358,7 +358,22 @@ app.post('/api/stripe/create-payment-intent', async (req, res) => {
 // Send donation confirmation emails (to donor and admin)
 const sendDonationEmails = async (formData, transactionRef, paidAt) => {
   try {
-    const { donorType, fullName, organisationName, email, isAnonymous, amount, timing, interval, phone, mailingAddress, mailingTown, mailingPostCode } = formData;
+    const {
+      donorType,
+      fullName,
+      organisationName,
+      email,
+      isAnonymous,
+      amount,
+      timing,
+      interval,
+      phone,
+      homePhone,
+      mobile,
+      mailingAddress,
+      mailingTown,
+      mailingPostCode,
+    } = formData;
 
     // Send confirmation to donor (if not anonymous)
     if (!isAnonymous && email) {
@@ -387,7 +402,8 @@ const sendDonationEmails = async (formData, transactionRef, paidAt) => {
       interval,
       donorType,
       isAnonymous,
-      phone,
+      homePhone: homePhone || phone,
+      mobile,
       mailingAddress,
       mailingTown,
       mailingPostCode,

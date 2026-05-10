@@ -557,21 +557,22 @@ export const createDonation = async (data) => {
     .input('full_name', sql.NVarChar(255), data.fullName || null)
     .input('organisation_name', sql.NVarChar(255), data.organisationName || null)
     .input('email', sql.NVarChar(255), data.email || null)
-    .input('phone', sql.NVarChar(50), data.phone || null)
+    .input('phone', sql.NVarChar(50), data.homePhone || data.phone || null)
+    .input('mobile', sql.NVarChar(50), data.mobile || null)
     .input('mailing_address', sql.NVarChar(500), data.mailingAddress || null)
     .input('mailing_town', sql.NVarChar(100), data.mailingTown || null)
     .input('mailing_postcode', sql.NVarChar(20), data.mailingPostCode || null)
     .query(`
       INSERT INTO donations (
         amount, timing, interval, donor_type, is_anonymous,
-        full_name, organisation_name, email, phone,
+        full_name, organisation_name, email, phone, mobile,
         mailing_address, mailing_town, mailing_postcode,
         status, created_at
       )
       OUTPUT INSERTED.id
       VALUES (
         @amount, @timing, @interval, @donor_type, @is_anonymous,
-        @full_name, @organisation_name, @email, @phone,
+        @full_name, @organisation_name, @email, @phone, @mobile,
         @mailing_address, @mailing_town, @mailing_postcode,
         'pending', GETDATE()
       )
@@ -592,7 +593,8 @@ export const updateDonation = async (id, formData, paymentData) => {
     .input('full_name', sql.NVarChar(255), formData.fullName || null)
     .input('organisation_name', sql.NVarChar(255), formData.organisationName || null)
     .input('email', sql.NVarChar(255), formData.email || null)
-    .input('phone', sql.NVarChar(50), formData.phone || null)
+    .input('phone', sql.NVarChar(50), formData.homePhone || formData.phone || null)
+    .input('mobile', sql.NVarChar(50), formData.mobile || null)
     .input('mailing_address', sql.NVarChar(500), formData.mailingAddress || null)
     .input('mailing_town', sql.NVarChar(100), formData.mailingTown || null)
     .input('mailing_postcode', sql.NVarChar(20), formData.mailingPostCode || null)
@@ -613,6 +615,7 @@ export const updateDonation = async (id, formData, paymentData) => {
         organisation_name = @organisation_name,
         email = @email,
         phone = @phone,
+        mobile = @mobile,
         mailing_address = @mailing_address,
         mailing_town = @mailing_town,
         mailing_postcode = @mailing_postcode,

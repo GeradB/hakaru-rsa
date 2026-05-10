@@ -136,7 +136,25 @@ export function createDonorDonationEmail(data) {
  * Generate admin notification email for new donation
  */
 export function createAdminDonationEmail(data) {
-  const { fullName, email, amount, timing, interval, donorType, organisationName, phone, mailingAddress, mailingTown, mailingPostCode, isAnonymous, transactionRef, paidAt } = data;
+  const {
+    fullName,
+    email,
+    amount,
+    timing,
+    interval,
+    donorType,
+    organisationName,
+    homePhone,
+    mobile,
+    phone,
+    mailingAddress,
+    mailingTown,
+    mailingPostCode,
+    isAnonymous,
+    transactionRef,
+    paidAt,
+  } = data;
+  const homeTel = homePhone || phone;
 
   const displayAmount = typeof amount === 'number' ? amount.toFixed(2) : String(amount);
   const donorName = donorType === 'organisation' ? (organisationName || fullName) : (fullName || 'Unknown');
@@ -188,10 +206,17 @@ export function createAdminDonationEmail(data) {
                 <span style="${baseStyles.rowValue}">${email || 'Not provided'}</span>
               </div>
 
-              ${phone ? `
+              ${homeTel ? `
                 <div style="${baseStyles.row}">
-                  <span style="${baseStyles.rowLabel}">Phone</span>
-                  <span style="${baseStyles.rowValue}">${phone}</span>
+                  <span style="${baseStyles.rowLabel}">Home phone</span>
+                  <span style="${baseStyles.rowValue}">${homeTel}</span>
+                </div>
+              ` : ''}
+
+              ${mobile ? `
+                <div style="${baseStyles.row}">
+                  <span style="${baseStyles.rowLabel}">Mobile</span>
+                  <span style="${baseStyles.rowValue}">${mobile}</span>
                 </div>
               ` : ''}
 

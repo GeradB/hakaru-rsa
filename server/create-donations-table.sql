@@ -13,6 +13,7 @@ CREATE TABLE [dbo].[donations] (
     [organisation_name] NVARCHAR(255) NULL,
     [email] NVARCHAR(255) NOT NULL,
     [phone] NVARCHAR(50) NULL,
+    [mobile] NVARCHAR(50) NULL,
     [mailing_address] NVARCHAR(500) NULL,
     [mailing_town] NVARCHAR(100) NULL,
     [mailing_postcode] NVARCHAR(20) NULL,

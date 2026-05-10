@@ -12,6 +12,10 @@ const MEMBERSHIP_FEES = {
   'Life Member': 0,
 };
 
+/** Matches HakaruRSAMembership.jsx input styling */
+const inputClass =
+  'w-full px-4 py-3 border-2 border-gray-300 rounded-lg bg-white focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors';
+
 function FormSection({ title, children }) {
   return (
     <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl p-8">
@@ -24,8 +28,8 @@ function FormSection({ title, children }) {
 function Field({ label, required, children }) {
   return (
     <div>
-      <label className="block text-gray-700 font-bold mb-2">
-        {label} {required ? <span className="text-rsa-gold">*</span> : null}
+      <label className="block text-sm font-bold text-rsa-navy mb-2">
+        {label} {required ? <span className="text-red-500">*</span> : null}
       </label>
       {children}
     </div>
@@ -251,6 +255,11 @@ export default function HakaruRSARenewal() {
   const [addressLoading, setAddressLoading] = useState(false);
   const [showAddressResults, setShowAddressResults] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [physicalAddressSearch, setPhysicalAddressSearch] = useState("");
+  const [physicalAddressResults, setPhysicalAddressResults] = useState([]);
+  const [physicalAddressLoading, setPhysicalAddressLoading] = useState(false);
+  const [showPhysicalAddressResults, setShowPhysicalAddressResults] = useState(false);
+  const [debouncedPhysicalSearch, setDebouncedPhysicalSearch] = useState("");
   const [form, setForm] = useState({
     fullName: '',
     membershipNumber: '',
@@ -282,7 +291,8 @@ export default function HakaruRSARenewal() {
 
     setAddressLoading(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001";
+      const apiUrl =
+        import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:3001";
       const response = await fetch(`${apiUrl}/api/address/lookup?q=${encodeURIComponent(query)}`);
       const data = await response.json();
 
@@ -319,18 +329,67 @@ export default function HakaruRSARenewal() {
     setShowAddressResults(false);
   };
 
-  // Close dropdown on outside click
+  const searchPhysicalAddress = useCallback(async (query) => {
+    if (query.length < 3) {
+      setPhysicalAddressResults([]);
+      setShowPhysicalAddressResults(false);
+      return;
+    }
+
+    setPhysicalAddressLoading(true);
+    try {
+      const apiUrl =
+        import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:3001";
+      const response = await fetch(`${apiUrl}/api/address/lookup?q=${encodeURIComponent(query)}`);
+      const data = await response.json();
+
+      if (Array.isArray(data)) {
+        setPhysicalAddressResults(
+          data.map((item) => ({
+            id: item.place_id,
+            fullAddress: item.display_name,
+            street:
+              item.address?.road ||
+              item.address?.pedestrian ||
+              item.address?.street ||
+              "",
+            town: item.address?.town || item.address?.city || item.address?.suburb || "",
+            postcode: item.address?.postcode || "",
+          })),
+        );
+        setShowPhysicalAddressResults(true);
+      }
+    } catch (error) {
+      console.error("Address lookup failed:", error);
+      setPhysicalAddressResults([]);
+    } finally {
+      setPhysicalAddressLoading(false);
+    }
+  }, []);
+
+  const selectPhysicalAddress = (address) => {
+    set("physicalAddress", address.street);
+    set("physicalTown", address.town);
+    set("physicalPostCode", address.postcode);
+    setPhysicalAddressSearch(address.fullAddress);
+    setPhysicalAddressResults([]);
+    setShowPhysicalAddressResults(false);
+  };
+
+  // Close dropdowns on outside click
   useEffect(() => {
+    if (!showAddressResults && !showPhysicalAddressResults) return undefined;
     const handleClickOutside = (e) => {
       if (!e.target.closest(".address-search-container")) {
         setShowAddressResults(false);
       }
+      if (!e.target.closest(".physical-address-search-container")) {
+        setShowPhysicalAddressResults(false);
+      }
     };
-    if (showAddressResults) {
-      document.addEventListener("click", handleClickOutside);
-      return () => document.removeEventListener("click", handleClickOutside);
-    }
-  }, [showAddressResults]);
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, [showAddressResults, showPhysicalAddressResults]);
 
   // Debounce address search to avoid rate limiting
   useEffect(() => {
@@ -341,6 +400,13 @@ export default function HakaruRSARenewal() {
   }, [addressSearch]);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPhysicalSearch(physicalAddressSearch);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [physicalAddressSearch]);
+
+  useEffect(() => {
     if (debouncedSearch) {
       searchAddress(debouncedSearch);
     } else {
@@ -348,6 +414,15 @@ export default function HakaruRSARenewal() {
       setShowAddressResults(false);
     }
   }, [debouncedSearch, searchAddress]);
+
+  useEffect(() => {
+    if (debouncedPhysicalSearch) {
+      searchPhysicalAddress(debouncedPhysicalSearch);
+    } else {
+      setPhysicalAddressResults([]);
+      setShowPhysicalAddressResults(false);
+    }
+  }, [debouncedPhysicalSearch, searchPhysicalAddress]);
 
   const fee = MEMBERSHIP_FEES[form.membershipType] ?? 0;
   const donationAmount = Number.isFinite(Number(form.donation)) ? Number(form.donation) : 0;
@@ -367,7 +442,8 @@ export default function HakaruRSARenewal() {
   }, [form.membershipType, form.email]);
 
   const handleStripePaid = useCallback(async (paymentIntent) => {
-    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001";
+    const apiUrl =
+      import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:3001";
 
     try {
       // Submit renewal data to database
@@ -473,7 +549,7 @@ export default function HakaruRSARenewal() {
                 type="text"
                 value={form.fullName}
                 onChange={(e) => set('fullName', e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
+                className={inputClass}
                 placeholder="John Smith"
                 required
               />
@@ -484,7 +560,7 @@ export default function HakaruRSARenewal() {
                 type="text"
                 value={form.membershipNumber}
                 onChange={(e) => set('membershipNumber', e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
+                className={inputClass}
                 placeholder="Optional"
               />
             </Field>
@@ -494,7 +570,7 @@ export default function HakaruRSARenewal() {
                 type="date"
                 value={form.dob}
                 onChange={(e) => set('dob', e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
+                className={inputClass}
               />
             </Field>
 
@@ -503,7 +579,7 @@ export default function HakaruRSARenewal() {
                 type="email"
                 value={form.email}
                 onChange={(e) => set('email', e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
+                className={inputClass}
                 placeholder="your@email.com"
                 required
               />
@@ -512,20 +588,24 @@ export default function HakaruRSARenewal() {
             <Field label="Home phone">
               <input
                 type="tel"
+                inputMode="tel"
+                autoComplete="tel-national"
                 value={form.homePhone}
                 onChange={(e) => set('homePhone', e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
-                placeholder="09 431 2345"
+                className={inputClass}
+                placeholder="09 xxx xxxx"
               />
             </Field>
 
             <Field label="Mobile">
               <input
                 type="tel"
+                inputMode="tel"
+                autoComplete="tel-national"
                 value={form.mobile}
                 onChange={(e) => set('mobile', e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
-                placeholder="021 123 4567"
+                className={inputClass}
+                placeholder="021 xxx xxxx"
               />
             </Field>
           </div>
@@ -545,7 +625,7 @@ export default function HakaruRSARenewal() {
                         onChange={(e) => setAddressSearch(e.target.value)}
                         onFocus={() => addressResults.length > 0 && setShowAddressResults(true)}
                         placeholder="Start typing address to search..."
-                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
+                        className={inputClass}
                       />
                       {addressLoading && (
                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -576,7 +656,7 @@ export default function HakaruRSARenewal() {
                       type="text"
                       value={form.mailingAddress}
                       onChange={(e) => set('mailingAddress', e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
+                      className={inputClass}
                       placeholder="Or enter manually"
                     />
                   </Field>
@@ -585,7 +665,7 @@ export default function HakaruRSARenewal() {
                       type="text"
                       value={form.mailingTown}
                       onChange={(e) => set('mailingTown', e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
+                      className={inputClass}
                     />
                   </Field>
                   <Field label="Post code">
@@ -593,7 +673,7 @@ export default function HakaruRSARenewal() {
                       type="text"
                       value={form.mailingPostCode}
                       onChange={(e) => set('mailingPostCode', e.target.value)}
-                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
+                      className={inputClass}
                       placeholder="0000"
                     />
                   </Field>
@@ -604,32 +684,69 @@ export default function HakaruRSARenewal() {
             <div>
               <h3 className="text-lg font-bold text-rsa-navy mb-2">Physical address</h3>
               <p className="text-sm text-gray-600 mb-4">If different from your mailing address.</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Field label="Street address">
-                  <input
-                    type="text"
-                    value={form.physicalAddress}
-                    onChange={(e) => set('physicalAddress', e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
-                  />
-                </Field>
-                <Field label="Town">
-                  <input
-                    type="text"
-                    value={form.physicalTown}
-                    onChange={(e) => set('physicalTown', e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
-                  />
-                </Field>
-                <Field label="Post code">
-                  <input
-                    type="text"
-                    value={form.physicalPostCode}
-                    onChange={(e) => set('physicalPostCode', e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
-                    placeholder="0000"
-                  />
-                </Field>
+              <div className="space-y-4">
+                <div className="physical-address-search-container">
+                  <Field label="Search address">
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={physicalAddressSearch}
+                        onChange={(e) => setPhysicalAddressSearch(e.target.value)}
+                        onFocus={() => physicalAddressResults.length > 0 && setShowPhysicalAddressResults(true)}
+                        placeholder="Start typing address to search..."
+                        className={inputClass}
+                      />
+                      {physicalAddressLoading && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <div className="w-5 h-5 border-2 border-rsa-navy border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
+                      {showPhysicalAddressResults && physicalAddressResults.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border-2 border-rsa-navy/30 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {physicalAddressResults.map((addr) => (
+                            <button
+                              key={addr.id}
+                              type="button"
+                              onClick={() => selectPhysicalAddress(addr)}
+                              className="w-full px-4 py-3 text-left text-sm hover:bg-rsa-gold/10 border-b border-gray-100 last:border-0 transition-colors"
+                            >
+                              <div className="font-bold text-rsa-navy">{addr.fullAddress}</div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Search by street name, town, or postcode</p>
+                  </Field>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Field label="Street address">
+                    <input
+                      type="text"
+                      value={form.physicalAddress}
+                      onChange={(e) => set('physicalAddress', e.target.value)}
+                      className={inputClass}
+                      placeholder="Or enter manually"
+                    />
+                  </Field>
+                  <Field label="Town">
+                    <input
+                      type="text"
+                      value={form.physicalTown}
+                      onChange={(e) => set('physicalTown', e.target.value)}
+                      className={inputClass}
+                    />
+                  </Field>
+                  <Field label="Post code">
+                    <input
+                      type="text"
+                      value={form.physicalPostCode}
+                      onChange={(e) => set('physicalPostCode', e.target.value)}
+                      className={inputClass}
+                      placeholder="0000"
+                    />
+                  </Field>
+                </div>
               </div>
             </div>
           </div>
@@ -703,7 +820,7 @@ export default function HakaruRSARenewal() {
                     step="5"
                     value={form.donation}
                     onChange={(e) => set('donation', e.target.value)}
-                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors"
+                    className={inputClass}
                     placeholder="0.00"
                   />
                 </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { apiUrl, fetchApiJson } from '../apiBase';
 import { getStripe } from '../lib/stripe';
@@ -12,6 +12,11 @@ const INTERVALS = [
   { value: '6-monthly', label: '6 Monthly' },
   { value: 'annually', label: 'Annually' },
 ];
+
+/** Match HakaruRSAMembership / HakaruRSARenewal donor fields */
+const donorFieldLabelClass = 'block text-sm font-bold text-rsa-navy mb-2';
+const donorInputClass =
+  'w-full px-4 py-3 border-2 border-gray-300 rounded-lg bg-white focus:border-rsa-gold focus:ring-2 focus:ring-rsa-gold/20 outline-none transition-colors';
 
 function StripePaymentInner({ amount, timing, interval, donorType, isAnonymous, donorData, onSuccess }) {
   const stripe = useStripe();
@@ -242,13 +247,19 @@ export default function Donation() {
     fullName: '',
     organisationName: '',
     email: '',
-    phone: '',
+    homePhone: '',
+    mobile: '',
     mailingAddress: '',
     mailingTown: '',
     mailingPostCode: '',
   });
   const [showPayment, setShowPayment] = useState(false);
   const [donationSuccess, setDonationSuccess] = useState(false);
+  const [addressSearch, setAddressSearch] = useState('');
+  const [addressResults, setAddressResults] = useState([]);
+  const [addressLoading, setAddressLoading] = useState(false);
+  const [showAddressResults, setShowAddressResults] = useState(false);
+  const [debouncedAddressSearch, setDebouncedAddressSearch] = useState('');
 
   const handlePresetAmount = (preset) => {
     setAmount(preset);
@@ -274,6 +285,77 @@ export default function Donation() {
     setDonationSuccess(true);
     window.scrollTo(0, 0);
   };
+
+  const searchAddresses = useCallback(async (query) => {
+    if (query.length < 3) {
+      setAddressResults([]);
+      setShowAddressResults(false);
+      return;
+    }
+    setAddressLoading(true);
+    try {
+      const response = await fetch(apiUrl(`/api/address/lookup?q=${encodeURIComponent(query)}`));
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setAddressResults(
+          data.map((item) => ({
+            id: item.place_id,
+            fullAddress: item.display_name,
+            street:
+              item.address?.road ||
+              item.address?.pedestrian ||
+              item.address?.street ||
+              '',
+            town: item.address?.town || item.address?.city || item.address?.suburb || '',
+            postcode: item.address?.postcode || '',
+          })),
+        );
+        setShowAddressResults(true);
+      }
+    } catch (e) {
+      console.error('Address lookup failed:', e);
+      setAddressResults([]);
+    } finally {
+      setAddressLoading(false);
+    }
+  }, []);
+
+  const selectMailingFromLookup = (addr) => {
+    setDonorData((prev) => ({
+      ...prev,
+      mailingAddress: addr.street,
+      mailingTown: addr.town,
+      mailingPostCode: addr.postcode,
+    }));
+    setAddressSearch(addr.fullAddress);
+    setAddressResults([]);
+    setShowAddressResults(false);
+  };
+
+  useEffect(() => {
+    if (!showAddressResults) return undefined;
+    const close = (e) => {
+      if (!e.target.closest('.donation-address-search')) {
+        setShowAddressResults(false);
+      }
+    };
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [showAddressResults]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedAddressSearch(addressSearch), 500);
+    return () => clearTimeout(t);
+  }, [addressSearch]);
+
+  useEffect(() => {
+    if (debouncedAddressSearch) {
+      searchAddresses(debouncedAddressSearch);
+    } else {
+      setAddressResults([]);
+      setShowAddressResults(false);
+    }
+  }, [debouncedAddressSearch, searchAddresses]);
 
   // Check for success in URL
   useEffect(() => {
@@ -459,122 +541,179 @@ export default function Donation() {
       </div>
 
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-xl font-semibold text-rsa-navy mb-4">
+        <h2 className="text-xl font-semibold font-heading text-rsa-navy mb-4">
           {donorType === 'me' ? 'Your Details' : 'Organisation Details'}
         </h2>
 
         {donorType === 'me' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name *
+              <label className={donorFieldLabelClass}>
+                Full name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 name="fullName"
                 value={donorData.fullName}
                 onChange={handleDonorDataChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-rsa-navy focus:border-transparent"
+                className={donorInputClass}
+                placeholder="John Smith"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email *
+              <label className={donorFieldLabelClass}>
+                Email address <span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
                 name="email"
+                inputMode="email"
+                autoComplete="email"
                 value={donorData.email}
                 onChange={handleDonorDataChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-rsa-navy focus:border-transparent"
+                className={donorInputClass}
+                placeholder="your@email.com"
                 required
               />
             </div>
           </div>
         ) : (
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Organisation Name *
+            <label className={donorFieldLabelClass}>
+              Organisation name <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               name="organisationName"
               value={donorData.organisationName}
               onChange={handleDonorDataChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-rsa-navy focus:border-transparent"
+              className={donorInputClass}
               required
             />
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div
+          className={`grid grid-cols-1 gap-6 mb-4 ${
+            !isAnonymous && donorType === 'organisation' ? 'md:grid-cols-3' : 'md:grid-cols-2'
+          }`}
+        >
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Phone
-            </label>
+            <label className={donorFieldLabelClass}>Phone</label>
             <input
               type="tel"
-              name="phone"
-              value={donorData.phone}
+              name="homePhone"
+              inputMode="tel"
+              autoComplete="tel-national"
+              value={donorData.homePhone}
               onChange={handleDonorDataChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-rsa-navy focus:border-transparent"
+              className={donorInputClass}
+              placeholder="09 xxx xxxx"
             />
           </div>
-          {!isAnonymous && (
+          <div>
+            <label className={donorFieldLabelClass}>Mobile</label>
+            <input
+              type="tel"
+              name="mobile"
+              inputMode="tel"
+              autoComplete="tel-national"
+              value={donorData.mobile}
+              onChange={handleDonorDataChange}
+              className={donorInputClass}
+              placeholder="021 xxx xxxx"
+            />
+          </div>
+          {/* Email for "Organisation" only — "Me" already has Email in the row above */}
+          {!isAnonymous && donorType === 'organisation' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email {donorType === 'organisation' && '*'}
+              <label className={donorFieldLabelClass}>
+                Email address <span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
                 name="email"
+                inputMode="email"
+                autoComplete="email"
                 value={donorData.email}
                 onChange={handleDonorDataChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-rsa-navy focus:border-transparent"
-                required={donorType === 'organisation'}
+                className={donorInputClass}
+                placeholder="your@email.com"
+                required
               />
             </div>
           )}
         </div>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Mailing Address
-          </label>
-          <input
-            type="text"
-            name="mailingAddress"
-            value={donorData.mailingAddress}
-            onChange={handleDonorDataChange}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-rsa-navy focus:border-transparent"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Town
-            </label>
-            <input
-              type="text"
-              name="mailingTown"
-              value={donorData.mailingTown}
-              onChange={handleDonorDataChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-rsa-navy focus:border-transparent"
-            />
+        <div className="space-y-4">
+          <p className="text-lg font-bold text-rsa-navy">Mailing address</p>
+          <div className="donation-address-search">
+            <label className={donorFieldLabelClass}>Search address</label>
+            <div className="relative">
+              <input
+                type="text"
+                value={addressSearch}
+                onChange={(e) => setAddressSearch(e.target.value)}
+                onFocus={() => addressResults.length > 0 && setShowAddressResults(true)}
+                placeholder="Start typing address to search..."
+                className={donorInputClass}
+              />
+              {addressLoading && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <div className="w-5 h-5 border-2 border-rsa-navy border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+              {showAddressResults && addressResults.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border-2 border-rsa-navy/30 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {addressResults.map((addr) => (
+                    <button
+                      key={addr.id}
+                      type="button"
+                      onClick={() => selectMailingFromLookup(addr)}
+                      className="w-full px-4 py-3 text-left text-sm hover:bg-rsa-gold/10 border-b border-gray-100 last:border-0 transition-colors"
+                    >
+                      <div className="font-bold text-rsa-navy">{addr.fullAddress}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Search by street name, town, or postcode</p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Postcode
-            </label>
+            <label className={donorFieldLabelClass}>Street address</label>
             <input
               type="text"
-              name="mailingPostCode"
-              value={donorData.mailingPostCode}
+              name="mailingAddress"
+              value={donorData.mailingAddress}
               onChange={handleDonorDataChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-rsa-navy focus:border-transparent"
+              className={donorInputClass}
+              placeholder="Or enter manually"
             />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className={donorFieldLabelClass}>Town</label>
+              <input
+                type="text"
+                name="mailingTown"
+                value={donorData.mailingTown}
+                onChange={handleDonorDataChange}
+                className={donorInputClass}
+              />
+            </div>
+            <div>
+              <label className={donorFieldLabelClass}>Post code</label>
+              <input
+                type="text"
+                name="mailingPostCode"
+                value={donorData.mailingPostCode}
+                onChange={handleDonorDataChange}
+                className={donorInputClass}
+                placeholder="0000"
+              />
+            </div>
           </div>
         </div>
       </div>
