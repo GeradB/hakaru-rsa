@@ -1,6 +1,9 @@
 import { Link } from 'react-router-dom';
 import { useSiteContent } from '../context/SiteContentContext';
 
+/** RNZRSA wordmark — vector, sharp at any size (matches rsa.org.nz menu asset) */
+const HERO_RSA_LOGO_SRC = '/rsa-logo-source.svg';
+
 export default function Home() {
   const siteContent = useSiteContent();
   const { hero, welcome, announcements, upcomingEvents, homeCta } = siteContent;
@@ -29,7 +32,17 @@ export default function Home() {
       {/* Hero Section */}
       <section className="relative overflow-hidden py-24 md:py-32">
         {heroBg}
-        <div className="relative z-10 max-w-4xl mx-auto px-4 text-center">
+        <div className="relative z-10 max-w-4xl mx-auto px-4 text-center flex flex-col items-center">
+          <div className="mb-8 md:mb-10 w-full flex justify-center">
+            <img
+              src={HERO_RSA_LOGO_SRC}
+              alt="RNZRSA"
+              className="w-full max-w-[min(100%,520px)] md:max-w-xl lg:max-w-2xl h-auto object-contain drop-shadow-[0_4px_24px_rgba(0,0,0,0.35)]"
+              width={390}
+              height={127}
+              decoding="async"
+            />
+          </div>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 font-heading leading-tight">
             {hero.title}
           </h1>
@@ -53,11 +66,12 @@ export default function Home() {
         <div className="max-w-4xl mx-auto px-4 text-center">
           <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl p-8 md:p-12 overflow-hidden">
             {showWelcomeImg && (
-              <div className="mb-8 -mx-8 -mt-8 md:-mx-12 md:-mt-12">
+              <div className="mb-8 -mx-8 -mt-8 md:-mx-12 md:-mt-12 bg-[#042c46] flex justify-center items-center py-8 px-6">
                 <img
                   src={welcome.imageUrl.trim()}
-                  alt=""
-                  className="w-full max-h-72 object-cover"
+                  alt="RNZRSA"
+                  className="w-full max-w-2xl max-h-48 md:max-h-56 h-auto object-contain"
+                  decoding="async"
                 />
               </div>
             )}
