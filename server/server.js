@@ -347,7 +347,8 @@ app.post('/api/stripe/create-payment-intent', async (req, res) => {
       amount: minorAmount,
       currency: currencyLower,
       receipt_email: receiptEmail || undefined,
-      automatic_payment_methods: { enabled: true },
+      // Card (+ wallets via Payment Element). allow_redirects:never excludes Klarna etc.
+      automatic_payment_methods: { enabled: true, allow_redirects: 'never' },
       metadata: metadata && typeof metadata === 'object' ? metadata : {},
     });
 

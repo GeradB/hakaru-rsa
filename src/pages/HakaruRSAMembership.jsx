@@ -84,7 +84,7 @@ function StripePaymentInner({ amountNzd, currency, receiptEmail, metadata, onPai
 
   return (
     <div className="space-y-4">
-      <PaymentElement />
+      <PaymentElement options={{ layout: 'tabs' }} />
 
       {payError ? (
         <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg p-3">{payError}</div>
