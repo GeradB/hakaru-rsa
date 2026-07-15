@@ -25,6 +25,7 @@ import AdminGallery from './pages/AdminGallery';
 import AdminSiteContent from './pages/AdminSiteContent';
 import Donation from './pages/Donation';
 import { SiteContentProvider } from './context/SiteContentContext';
+import RouteSeo from './components/RouteSeo';
 
 // Scroll to top on route change
 function ScrollToTopOnRouteChange() {
@@ -105,6 +106,7 @@ function AppContent() {
 function App() {
   return (
     <Router>
+      <RouteSeo />
       <SiteContentProvider>
         <ScrollToTopOnRouteChange />
         <AppContent />
