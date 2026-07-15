@@ -37,17 +37,16 @@ import {
   createAlbum,
   updateAlbum,
   deleteAlbum,
-  listCmsPatches,
-  upsertCmsPatch,
 } from './db.js';
 import { uploadGalleryImage, deleteGalleryBlob, isAzureGalleryConfigured } from './galleryBlob.js';
+import { pickFragment, CMS_SLUGS } from './cmsMerge.js';
 import {
-  mergeSiteContentPatches,
-  pickFragment,
-  fragmentKeysValid,
-  CMS_SLUGS,
-  getDefaultSiteContent,
-} from './cmsMerge.js';
+  getMergedSiteContentSafe,
+  saveFragment,
+  detectImageType,
+  uploadCmsImage,
+} from './cmsService.js';
+import { teamsMessagingHandler, isTeamsBotConfigured } from './agent/teamsBot.js';
 import {
   createDonorDonationEmail,
   createAdminDonationEmail,
@@ -123,27 +122,6 @@ const mapGalleryRow = (row) => ({
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
-
-const detectImageType = (buffer) => {
-  if (!buffer || buffer.length < 12) return null;
-  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
-    return { ext: 'jpg', mime: 'image/jpeg' };
-  }
-  if (
-    buffer[0] === 0x89 &&
-    buffer[1] === 0x50 &&
-    buffer[2] === 0x4e &&
-    buffer[3] === 0x47
-  ) {
-    return { ext: 'png', mime: 'image/png' };
-  }
-  const riff = buffer.toString('ascii', 0, 4);
-  const webp = buffer.toString('ascii', 8, 12);
-  if (riff === 'RIFF' && webp === 'WEBP') {
-    return { ext: 'webp', mime: 'image/webp' };
-  }
-  return null;
-};
 
 const adminAuthConfigured = () =>
   !!(process.env.ADMIN_USERNAME && process.env.ADMIN_PASSWORD_HASH);
@@ -709,6 +687,13 @@ app.post('/api/donation/submit', async (req, res) => {
     res.json({ success: true, donationId });
   } catch (error) {
     console.error('Error creating donation:', error);
+    const msg = error?.message || '';
+    if (
+      msg.includes('amount must be greater') ||
+      msg.includes('Email is required')
+    ) {
+      return res.status(400).json({ error: msg });
+    }
     res.status(500).json({ error: 'Failed to create donation' });
   }
 });
@@ -1091,19 +1076,6 @@ app.get('/api/admin/gallery/album/:albumId', requireAdmin, async (req, res) => {
   }
 });
 
-async function getMergedSiteContentSafe() {
-  if (!dbConfigured) {
-    return getDefaultSiteContent();
-  }
-  try {
-    const patches = await listCmsPatches();
-    return mergeSiteContentPatches(patches);
-  } catch (err) {
-    console.error('Site content CMS load failed:', err.message || err);
-    return getDefaultSiteContent();
-  }
-}
-
 // --- Public CMS (merged defaults + DB patches) ---
 app.get('/api/site-content', async (_req, res) => {
   try {
@@ -1136,28 +1108,24 @@ app.get('/api/admin/site-content/:slug', requireAdmin, async (req, res) => {
 });
 
 app.put('/api/admin/site-content/:slug', requireAdmin, async (req, res) => {
-  if (!dbConfigured) {
-    return res.status(503).json({ error: 'Database is not configured' });
-  }
   const { slug } = req.params;
   if (!CMS_SLUGS.includes(slug)) {
     return res.status(400).json({ error: 'Unknown slug' });
   }
   const payload = req.body?.payload ?? req.body;
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    return res.status(400).json({ error: 'Body must be a JSON object (or { payload })' });
-  }
-  if (!fragmentKeysValid(slug, payload)) {
-    return res.status(400).json({ error: 'Payload contains invalid keys for this slug' });
-  }
   try {
-    await upsertCmsPatch(slug, payload);
-    const merged = await getMergedSiteContentSafe();
-    res.json({
-      success: true,
-      fragment: pickFragment(slug, merged),
-    });
+    const fragment = await saveFragment(slug, payload);
+    res.json({ success: true, fragment });
   } catch (err) {
+    if (err.message === 'Database is not configured') {
+      return res.status(503).json({ error: err.message });
+    }
+    if (
+      err.message === 'Payload must be a JSON object' ||
+      err.message === 'Payload contains invalid keys for this slug'
+    ) {
+      return res.status(400).json({ error: err.message });
+    }
     console.error(err);
     res.status(500).json({ error: 'Failed to save content' });
   }
@@ -1174,30 +1142,27 @@ app.post(
   requireAdmin,
   cmsUpload.single('image'),
   async (req, res) => {
-    if (!isAzureGalleryConfigured()) {
-      return res.status(503).json({ error: 'Azure Blob Storage is not configured' });
-    }
     const file = req.file;
     if (!file || !file.buffer?.length) {
       return res.status(400).json({ error: 'Missing image file (field name: image)' });
     }
-    const kind = detectImageType(file.buffer);
-    if (!kind) {
-      return res.status(400).json({ error: 'Invalid format (JPEG, PNG, WebP only)' });
-    }
-    const now = new Date();
-    const y = now.getUTCFullYear();
-    const m = String(now.getUTCMonth() + 1).padStart(2, '0');
-    const blobName = `cms/${y}/${m}/${crypto.randomUUID()}.${kind.ext}`;
     try {
-      const publicUrl = await uploadGalleryImage(file.buffer, blobName, kind.mime);
+      const { publicUrl, blobName } = await uploadCmsImage(file.buffer);
       res.status(201).json({ success: true, publicUrl, blobName });
     } catch (err) {
+      if (err.message?.includes('not configured') || err.message?.includes('Invalid format')) {
+        return res.status(err.message.includes('not configured') ? 503 : 400).json({
+          error: err.message,
+        });
+      }
       console.error('CMS image upload:', err);
       res.status(500).json({ error: 'Upload failed' });
     }
   },
 );
+
+// --- Teams content agent (Bot Framework) ---
+app.post('/api/messaging', teamsMessagingHandler);
 
 // GET /api/address/lookup
 // Proxy NZ address lookup to avoid CORS and rate limiting
@@ -1263,6 +1228,11 @@ const HTTPS_PORT = parseInt(HTTP_PORT) + 1 || 3002;
 app.listen(HTTP_PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${HTTP_PORT}`);
   console.log(`CORS allowed origins (FRONTEND_URLS): ${resolveAllowedOrigins().join(' | ')}`);
+  if (isTeamsBotConfigured()) {
+    console.log('Teams content agent: POST /api/messaging (configured)');
+  } else {
+    console.log('Teams content agent: not configured (set MICROSOFT_APP_* and AGENT_ALLOWED_*)');
+  }
 });
 
 // Start HTTPS server for local development with MSAL

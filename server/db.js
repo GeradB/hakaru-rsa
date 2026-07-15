@@ -548,15 +548,28 @@ export const updateRenewal = async (id, formData, paymentData) => {
 // Donation functions
 export const createDonation = async (data) => {
   const pool = await getPool();
+  const amount = data.amount != null && data.amount !== '' ? Number(data.amount) : null;
+  if (amount == null || !Number.isFinite(amount) || amount <= 0) {
+    throw new Error('Donation amount must be greater than zero');
+  }
+  const email =
+    (typeof data.email === 'string' && data.email.trim()) ||
+    (data.isAnonymous ? 'anonymous@hakarursa.co.nz' : null);
+  if (!email) {
+    throw new Error('Email is required unless the donation is anonymous');
+  }
+  const timing = data.timing || 'one-off';
+  const donorType = data.donorType || 'me';
+
   const result = await pool.request()
-    .input('amount', sql.Decimal(10, 2), data.amount || null)
-    .input('timing', sql.NVarChar(20), data.timing || null)
+    .input('amount', sql.Decimal(10, 2), amount)
+    .input('timing', sql.NVarChar(20), timing)
     .input('interval', sql.NVarChar(20), data.interval || null)
-    .input('donor_type', sql.NVarChar(20), data.donorType || null)
+    .input('donor_type', sql.NVarChar(20), donorType)
     .input('is_anonymous', sql.Bit, data.isAnonymous ? 1 : 0)
     .input('full_name', sql.NVarChar(255), data.fullName || null)
     .input('organisation_name', sql.NVarChar(255), data.organisationName || null)
-    .input('email', sql.NVarChar(255), data.email || null)
+    .input('email', sql.NVarChar(255), email)
     .input('phone', sql.NVarChar(50), data.homePhone || data.phone || null)
     .input('mobile', sql.NVarChar(50), data.mobile || null)
     .input('mailing_address', sql.NVarChar(500), data.mailingAddress || null)
@@ -671,5 +684,31 @@ export const upsertCmsPatch = async (slug, payloadObj) => {
         INSERT INTO cms_content_patches (slug, payload_json, updated_at)
         VALUES (@slug, @payload, SYSUTCDATETIME())
       `);
+  }
+};
+
+export const insertCmsAgentAudit = async (row) => {
+  try {
+    const pool = await getPool();
+    await pool
+      .request()
+      .input('channel', sql.NVarChar(32), row.channel || 'teams')
+      .input('actor_aad_object_id', sql.NVarChar(64), row.actorAadObjectId || null)
+      .input('actor_name', sql.NVarChar(256), row.actorName || null)
+      .input('action', sql.NVarChar(32), row.action || 'unknown')
+      .input('section', sql.NVarChar(64), row.section || null)
+      .input('slug', sql.NVarChar(64), row.slug || null)
+      .input('item_summary', sql.NVarChar(512), row.itemSummary || null)
+      .input('payload_json', sql.NVarChar(sql.MAX), row.payloadJson || null)
+      .query(`
+        INSERT INTO cms_agent_audit (
+          channel, actor_aad_object_id, actor_name, action, section, slug, item_summary, payload_json
+        )
+        VALUES (
+          @channel, @actor_aad_object_id, @actor_name, @action, @section, @slug, @item_summary, @payload_json
+        )
+      `);
+  } catch (err) {
+    console.warn('CMS agent audit insert failed:', err.message || err);
   }
 };
