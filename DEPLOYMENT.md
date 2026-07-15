@@ -81,6 +81,19 @@ In the Azure Portal, configure:
 3. **CORS**
    - Add your production domain to `FRONTEND_URLS`
 
+4. **Admin Entra security (required for Microsoft login)**
+   - `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` (SPA app registration IDs)
+   - `ADMIN_ALLOWED_AAD_OBJECT_IDS` — comma-separated Entra user object IDs allowed to call `/api/admin/*` (falls back to `AGENT_ALLOWED_AAD_OBJECT_IDS` if set)
+
+### Teams content agent (optional)
+
+See [docs/CONTENT_AGENT.md](docs/CONTENT_AGENT.md) for full setup. Summary:
+
+1. Run `server/migrations/004_cms_agent_audit.sql` on Azure SQL.
+2. Create Azure OpenAI + Azure Bot (Teams channel); messaging endpoint `https://<hakaru-api>/api/messaging`.
+3. Add App Service settings: `MICROSOFT_APP_*`, `AZURE_OPENAI_*`, `AGENT_ALLOWED_AAD_OBJECT_IDS`, `PUBLIC_SITE_URL`.
+4. Install the bot in Teams and allowlist Entra user object IDs.
+
 ### Local Development
 
 ```bash

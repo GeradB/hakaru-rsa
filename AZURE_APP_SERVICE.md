@@ -20,40 +20,43 @@ az webapp create --resource-group hakaru-rg --plan hakaru-plan --name hakaru-api
 ```
 
 ## Step 4: Configure App Settings
+
+**Do not put real secrets in this file or commit them to git.** Set values in Azure Portal or via CLI from a local secret store / Key Vault.
+
 ```bash
-az webapp config appsettings set --resource-group hakaru-rg --name hakaru-api --settings \
-  STRIPE_SECRET_KEY="sk_test_51TTsTdEOZAorwg9FR5tyKaml1z8i4GJb3UX9dovCa07C6QsTuiz5JZFtzfU02sOYdq98Oiy4BNOYNk7EEHejFhiO00rwU35x9V" \
-  SQL_SERVER_HOST="hakarusql.database.windows.net" \
-  SQL_SERVER_DATABASE="HakaruMainWebTrafiic" \
-  SQL_SERVER_USER="HakaruWebUser" \
-  SQL_SERVER_PASSWORD="DBoHakaruW3b!@#" \
+az webapp config appsettings set --resource-group RG-HakaruMainWebsite --name hakaru-api --settings \
+  STRIPE_SECRET_KEY="<from Stripe Dashboard>" \
+  SQL_SERVER_HOST="<your-sql>.database.windows.net" \
+  SQL_SERVER_DATABASE="<database>" \
+  SQL_SERVER_USER="<user>" \
+  SQL_SERVER_PASSWORD="<password>" \
   SQL_SERVER_PORT="1433" \
   SQL_SERVER_ENCRYPT="true" \
   SQL_SERVER_TRUST_CERT="true" \
-  AZURE_STORAGE_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=hakaruweb;AccountKey=xg0wG8lhfZpjdaZ5SdWHSkipuR/7u6yjsAIEQjoMH0pdTxYNwwq5wF8ouItwYfVfL+3bTT55fDiu+ASty+UjXQ==;EndpointSuffix=core.windows.net" \
+  AZURE_STORAGE_CONNECTION_STRING="<connection-string>" \
   AZURE_STORAGE_GALLERY_CONTAINER="hakaruweb" \
-  ADMIN_USERNAME="HakWEB1" \
-  ADMIN_PASSWORD_HASH='$2b$10$kepdiYQkli.RHN3ZjHG6YuhCUYADzZC05c8YCqn2Ad0SYgV2BRf0W' \
+  ADMIN_USERNAME="<admin-user>" \
+  ADMIN_PASSWORD_HASH="<bcrypt hash>" \
   COOKIE_SECURE="true" \
-  FRONTEND_URLS="https://black-smoke-0c7710210.7.azurestaticapps.net"
+  FRONTEND_URLS="https://www.hakarursa.co.nz,https://hakarursa.co.nz" \
+  PUBLIC_SITE_URL="https://www.hakarursa.co.nz" \
+  ENTRA_TENANT_ID="0f9e3c4e-92b5-4caf-ae9a-56a7e71882a8" \
+  ENTRA_CLIENT_ID="4fafdc19-8a0c-4021-8d27-32a2a1594772" \
+  ADMIN_ALLOWED_AAD_OBJECT_IDS="<comma-separated Entra object IDs>"
+```
+
+Generate `ADMIN_PASSWORD_HASH` locally:
+
+```bash
+cd server && node --input-type=module -e "import bcrypt from 'bcryptjs'; console.log(bcrypt.hashSync('YOUR_PASSWORD', 10));"
 ```
 
 ## Step 5: Deploy from GitHub
-```bash
-az webapp deployment source config --name hakaru-api --resource-group hakaru-rg --repo-url https://github.com/GeradB/hakaru-rsa --branch main --manual-integration
-```
 
-Or deploy using ZIP:
-```bash
-cd server
-zip -r deploy.zip *
-az webapp deployment source config-zip --resource-group hakaru-rg --name hakaru-api --src deploy.zip
-```
+Prefer the existing GitHub Actions workflow (`main_hakaru-api.yml`) with a publish profile secret.
 
 ## Step 6: Update Frontend
-In your Static Web App, set build environment variable or update `.env`:
-```
-VITE_API_BASE_URL=https://hakaru-api.azurewebsites.net
-```
 
-Rebuild and redeploy frontend.
+Build with `VITE_API_URL` / `VITE_API_BASE_URL` pointing at the App Service hostname.
+
+Also set Static Web App / SPA CORS origins on the API via `FRONTEND_URLS`.

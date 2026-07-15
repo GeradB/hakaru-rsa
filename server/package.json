@@ -7,7 +7,8 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "verify:bundle": "node -e \"import('./cmsMerge.js').then(()=>console.log('cmsMerge + siteContent.defaults.js OK'))\"",
-    "test:agent": "node --test agent/cmsAgentService.test.js"
+    "test:agent": "node --test agent/cmsAgentService.test.js",
+    "test:security": "node --test apexRedirect.test.js stripePayments.test.js"
   },
   "dependencies": {
     "@azure/openai": "^2.0.0",
@@ -20,7 +21,7 @@
     "crypto": "^1.0.1",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
-    "jwt-decode": "^4.0.0",
+    "jose": "^6.2.3",
     "mssql": "^12.5.0",
     "multer": "^1.4.5-lts.2",
     "nodemailer": "^6.9.7",

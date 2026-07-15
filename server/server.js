@@ -8,7 +8,6 @@ import cookieParser from 'cookie-parser';
 import multer from 'multer';
 import bcrypt from 'bcryptjs';
 import Stripe from 'stripe';
-import { jwtDecode } from 'jwt-decode';
 import https from 'https';
 import fs from 'fs';
 import path from 'path';
@@ -47,6 +46,9 @@ import {
   uploadCmsImage,
 } from './cmsService.js';
 import { teamsMessagingHandler, isTeamsBotConfigured } from './agent/teamsBot.js';
+import { verifyEntraIdToken } from './entraAuth.js';
+import { buildSafeWwwRedirect } from './apexRedirect.js';
+import { nzdToMinorUnits, verifyPaidPaymentIntent } from './stripePayments.js';
 import {
   createDonorDonationEmail,
   createAdminDonationEmail,
@@ -99,12 +101,7 @@ app.use((req, res, next) => {
   if (!host || !APEX_REDIRECT_HOSTS.has(host)) {
     return next();
   }
-  try {
-    const dest = new URL(req.originalUrl || '/', `${PUBLIC_SITE_ORIGIN}/`);
-    return res.redirect(301, dest.toString());
-  } catch {
-    return res.redirect(301, `${PUBLIC_SITE_ORIGIN}/`);
-  }
+  return res.redirect(301, buildSafeWwwRedirect(PUBLIC_SITE_ORIGIN, req.originalUrl || '/'));
 });
 
 // Middleware — browsers require your Static Web App URL in FRONTEND_URLS (see server/.env.example)
@@ -179,36 +176,19 @@ const checkLoginRateLimit = (ip) => {
 };
 
 const requireAdmin = async (req, res, next) => {
-  // Check for Entra ID Bearer token first
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const idToken = authHeader.substring(7);
     try {
-      // Decode and validate the Entra ID token
-      const decoded = jwtDecode(idToken);
-
-      // Verify token is from our tenant
-      const expectedTenantId = '0f9e3c4e-92b5-4caf-ae9a-56a7e71882a8';
-
-      if (decoded.tid !== expectedTenantId) {
-        return res.status(401).json({ error: 'Invalid token tenant' });
-      }
-
-      // Check token expiration
-      if (decoded.exp && Date.now() > decoded.exp * 1000) {
-        return res.status(401).json({ error: 'Token expired' });
-      }
-
-      // Token is valid, attach user info to request
-      req.user = {
-        email: decoded.email || decoded.preferred_username,
-        name: decoded.name,
-        oid: decoded.oid,
-      };
+      const user = await verifyEntraIdToken(idToken);
+      req.user = user;
       return next();
     } catch (err) {
-      console.error('Token validation error:', err);
-      return res.status(401).json({ error: 'Invalid token' });
+      const code = err.statusCode || 401;
+      if (code >= 500) {
+        console.error('Entra admin auth misconfiguration:', err.message || err);
+      }
+      return res.status(code).json({ error: err.message || 'Invalid token' });
     }
   }
 
@@ -312,10 +292,6 @@ const sendEmail = async (to, subject, html) => {
 // Generate unique transaction reference
 const generateTxnRef = () => {
   return `MEM-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-};
-
-const nzdToMinorUnits = (amountNzd) => {
-  return Math.round(Number(amountNzd) * 100);
 };
 
 // POST /api/stripe/create-payment-intent
@@ -558,16 +534,23 @@ app.post('/api/membership/submit', async (req, res) => {
 // Update membership with payment information and all form data
 app.post('/api/membership/update-payment', async (req, res) => {
   try {
-    const { membershipId, paymentIntentId, status, amount, formData } = req.body;
+    const { membershipId, paymentIntentId, amount, formData } = req.body;
 
     if (!membershipId) {
       return res.status(400).json({ error: 'Missing membershipId' });
     }
 
+    const verified = await verifyPaidPaymentIntent(stripe, {
+      paymentIntentId,
+      expectedAmountNzd: amount ?? formData?.total,
+      expectedCurrency: 'nzd',
+    });
+    const status = verified.status;
+
     const paymentData = {
-      stripePaymentIntentId: paymentIntentId,
+      stripePaymentIntentId: verified.id,
       paymentStatus: status,
-      amountPaid: amount,
+      amountPaid: verified.amountNzd,
       paidAt: status === 'succeeded' ? new Date().toISOString() : null,
       status: status === 'succeeded' ? 'paid' : status,
     };
@@ -576,7 +559,6 @@ app.post('/api/membership/update-payment', async (req, res) => {
       await updateMembership(membershipId, formData || {}, paymentData);
       console.log(`Membership ${membershipId} updated with payment: ${status}`);
 
-      // Send emails on successful payment
       if (status === 'succeeded') {
         const membership = await getMembership(membershipId);
         if (membership) {
@@ -590,7 +572,6 @@ app.post('/api/membership/update-payment', async (req, res) => {
         }
       }
     } else {
-      // Fallback: find and update in-memory record
       for (const [key, value] of pendingMemberships.entries()) {
         if (key === membershipId || value.stripePaymentIntentId === paymentIntentId) {
           pendingMemberships.set(key, { ...value, ...formData, ...paymentData });
@@ -601,6 +582,9 @@ app.post('/api/membership/update-payment', async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
+    if (error.statusCode && error.statusCode < 500) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error('Error updating payment:', error);
     res.status(500).json({ error: 'Failed to update payment information' });
   }
@@ -667,18 +651,30 @@ app.post('/api/renewal/submit', async (req, res) => {
 // POST /api/renewal/update-payment — single handler (duplicate routes skipped email send)
 app.post('/api/renewal/update-payment', async (req, res) => {
   try {
-    const { renewalId, paymentIntentId, status, amount, formData, fee, donation } = req.body;
+    const { renewalId, paymentIntentId, amount, formData, fee, donation } = req.body;
 
     if (!renewalId) {
       return res.status(400).json({ error: 'Missing renewalId' });
     }
 
+    const computedTotal =
+      donation != null || fee != null
+        ? (Number(fee) || 0) + (parseFloat(donation) || 0)
+        : amount;
+
+    const verified = await verifyPaidPaymentIntent(stripe, {
+      paymentIntentId,
+      expectedAmountNzd: computedTotal,
+      expectedCurrency: 'nzd',
+    });
+    const status = verified.status;
+
     const paymentData = {
-      stripePaymentIntentId: paymentIntentId,
+      stripePaymentIntentId: verified.id,
       paymentStatus: status,
-      amountPaid: amount,
+      amountPaid: verified.amountNzd,
       fee,
-      total: donation ? (fee || 0) + (parseFloat(donation) || 0) : (fee || 0),
+      total: Number.isFinite(Number(computedTotal)) ? Number(computedTotal) : verified.amountNzd,
       paidAt: status === 'succeeded' ? new Date().toISOString() : null,
       status: status === 'succeeded' ? 'paid' : status,
     };
@@ -687,9 +683,8 @@ app.post('/api/renewal/update-payment', async (req, res) => {
       await updateRenewal(renewalId, formData || {}, paymentData);
       console.log(`Renewal ${renewalId} updated with payment: ${status}`);
 
-      // Applicant copy uses formData.email from the renewal form (client sends formData: form)
       if (status === 'succeeded') {
-        const txnRef = paymentIntentId || renewalId;
+        const txnRef = verified.id || renewalId;
         await sendRenewalEmails(
           { ...(formData || {}), fee, donation, total: paymentData.total },
           txnRef,
@@ -699,6 +694,9 @@ app.post('/api/renewal/update-payment', async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
+    if (error.statusCode && error.statusCode < 500) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error('Error updating payment:', error);
     res.status(500).json({ error: 'Failed to update payment information' });
   }
@@ -733,16 +731,23 @@ app.post('/api/donation/submit', async (req, res) => {
 // Update donation with payment information and all form data
 app.post('/api/donation/update-payment', async (req, res) => {
   try {
-    const { donationId, paymentIntentId, status, amount, formData } = req.body;
+    const { donationId, paymentIntentId, amount, formData } = req.body;
 
     if (!donationId) {
       return res.status(400).json({ error: 'Missing donationId' });
     }
 
+    const verified = await verifyPaidPaymentIntent(stripe, {
+      paymentIntentId,
+      expectedAmountNzd: amount ?? formData?.amount,
+      expectedCurrency: 'nzd',
+    });
+    const status = verified.status;
+
     const paymentData = {
-      stripePaymentIntentId: paymentIntentId,
+      stripePaymentIntentId: verified.id,
       paymentStatus: status,
-      amountPaid: amount,
+      amountPaid: verified.amountNzd,
       paidAt: status === 'succeeded' ? new Date().toISOString() : null,
       status: status === 'succeeded' ? 'paid' : status,
     };
@@ -751,15 +756,17 @@ app.post('/api/donation/update-payment', async (req, res) => {
       await updateDonation(donationId, formData || {}, paymentData);
       console.log(`Donation ${donationId} updated with payment: ${status}`);
 
-      // Send emails on successful payment
       if (status === 'succeeded') {
-        const txnRef = paymentIntentId || donationId;
+        const txnRef = verified.id || donationId;
         await sendDonationEmails(formData, txnRef, paymentData.paidAt);
       }
     }
 
     res.json({ success: true });
   } catch (error) {
+    if (error.statusCode && error.statusCode < 500) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     console.error('Error updating payment:', error);
     res.status(500).json({ error: 'Failed to update payment information' });
   }

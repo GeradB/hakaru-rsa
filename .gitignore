@@ -17,6 +17,9 @@ dist-ssr
 .env.*.local
 server/.env
 
+# Local AI / editor agent state (may contain credentials)
+.claude/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
