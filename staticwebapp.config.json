@@ -1,7 +1,7 @@
 {
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/images/*", "/css/*", "/js/*", "/assets/*", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.svg", "*.ico", "*.woff", "*.woff2", "*.ttf", "*.eot", "*.mp4", "*.webm"]
+    "exclude": ["/images/*", "/css/*", "/js/*", "/assets/*", "/robots.txt", "/sitemap.xml", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.svg", "*.ico", "*.woff", "*.woff2", "*.ttf", "*.eot", "*.mp4", "*.webm", "*.txt", "*.xml"]
   },
   "mimeTypes": {
     ".json": "application/json"
