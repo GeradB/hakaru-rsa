@@ -77,6 +77,36 @@ const resolveAllowedOrigins = () => {
   return urls.length ? urls : [normalizeOrigin('http://localhost:5173')];
 };
 
+/** Canonical public site (www). Apex requests for the site hostname redirect here. */
+const PUBLIC_SITE_ORIGIN = normalizeOrigin(
+  process.env.PUBLIC_SITE_URL || 'https://www.hakarursa.co.nz',
+);
+const APEX_REDIRECT_HOSTS = new Set(
+  (process.env.APEX_REDIRECT_HOSTS || 'hakarursa.co.nz')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean),
+);
+
+// Redirect bare domain (and http) to https://www… — used when apex DNS points at this App Service
+app.use((req, res, next) => {
+  const rawHost = req.headers['x-forwarded-host'] || req.headers.host || '';
+  const host = String(rawHost)
+    .split(',')[0]
+    .trim()
+    .toLowerCase()
+    .replace(/:\d+$/, '');
+  if (!host || !APEX_REDIRECT_HOSTS.has(host)) {
+    return next();
+  }
+  try {
+    const dest = new URL(req.originalUrl || '/', `${PUBLIC_SITE_ORIGIN}/`);
+    return res.redirect(301, dest.toString());
+  } catch {
+    return res.redirect(301, `${PUBLIC_SITE_ORIGIN}/`);
+  }
+});
+
 // Middleware — browsers require your Static Web App URL in FRONTEND_URLS (see server/.env.example)
 app.use(
   cors({
