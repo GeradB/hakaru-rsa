@@ -11,6 +11,7 @@ export const CMS_SLUGS = Object.freeze([
   'events',
   'committee',
   'donate',
+  'newsletter',
 ]);
 
 /** Top-level keys from siteContent belonging to each admin “page” slug */
@@ -24,6 +25,7 @@ export const FRAGMENT_KEYS = Object.freeze({
   events: ['eventsPage'],
   committee: ['committeePage'],
   donate: ['donatePage'],
+  newsletter: ['newsletterPage'],
 });
 
 export function deepMerge(target, source) {

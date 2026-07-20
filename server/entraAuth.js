@@ -53,7 +53,11 @@ export async function verifyEntraIdToken(token) {
   }
 
   const allowed = getAdminAllowedObjectIds();
-  if (!allowed.length) {
+  const allowlistRequired =
+    process.env.NODE_ENV === 'production' ||
+    process.env.ADMIN_REQUIRE_ALLOWLIST === 'true';
+
+  if (!allowed.length && allowlistRequired) {
     const err = new Error(
       'Admin Entra allowlist is not configured (ADMIN_ALLOWED_AAD_OBJECT_IDS)',
     );
@@ -90,10 +94,22 @@ export async function verifyEntraIdToken(token) {
   }
 
   const oid = String(payload.oid || '').trim();
-  if (!oid || !allowed.includes(oid)) {
+  if (!oid) {
+    const err = new Error('Invalid token (missing oid)');
+    err.statusCode = 401;
+    throw err;
+  }
+
+  if (allowed.length && !allowed.includes(oid)) {
     const err = new Error('Forbidden');
     err.statusCode = 403;
     throw err;
+  }
+
+  if (!allowed.length) {
+    console.warn(
+      'ADMIN_ALLOWED_AAD_OBJECT_IDS is empty — allowing verified Entra admin in non-production. Set the allowlist before production use.',
+    );
   }
 
   return {

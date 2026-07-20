@@ -20,8 +20,10 @@ import Contact from './pages/Contact';
 import Committee from './pages/Committee';
 import Projects from './pages/Projects';
 import Gallery from './pages/Gallery';
+import Newsletter from './pages/Newsletter';
 import AdminLogin from './pages/AdminLogin';
 import AdminGallery from './pages/AdminGallery';
+import AdminNewsletters from './pages/AdminNewsletters';
 import AdminSiteContent from './pages/AdminSiteContent';
 import Donation from './pages/Donation';
 import { SiteContentProvider } from './context/SiteContentContext';
@@ -81,6 +83,7 @@ function AppContent() {
     <Routes>
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin/gallery" element={<AdminGallery />} />
+      <Route path="/admin/newsletters" element={<AdminNewsletters />} />
       <Route path="/admin/site-content" element={<AdminSiteContent />} />
       <Route path="/membership/become" element={<MembershipBecomeStandalone />} />
       <Route path="/membership/become/" element={<MembershipBecomeStandalone />} />
@@ -97,6 +100,7 @@ function AppContent() {
         <Route path="/committee" element={<Committee />} />
         <Route path="/projects" element={<Projects />} />
         <Route path="/gallery" element={<Gallery />} />
+        <Route path="/newsletter" element={<Newsletter />} />
         <Route path="/donate" element={<Donation />} />
       </Route>
     </Routes>

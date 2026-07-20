@@ -384,6 +384,9 @@ export default function AdminGallery() {
             <Link to="/admin/site-content" className={btnGhost}>
               Site content
             </Link>
+            <Link to="/admin/newsletters" className={btnGhost}>
+              Newsletters
+            </Link>
             <Link to="/gallery" className={btnGhost}>
               Public gallery
             </Link>

@@ -90,9 +90,10 @@ In the Azure Portal, configure:
 See [docs/CONTENT_AGENT.md](docs/CONTENT_AGENT.md) for full setup. Summary:
 
 1. Run `server/migrations/004_cms_agent_audit.sql` on Azure SQL.
-2. Create Azure OpenAI + Azure Bot (Teams channel); messaging endpoint `https://<hakaru-api>/api/messaging`.
-3. Add App Service settings: `MICROSOFT_APP_*`, `AZURE_OPENAI_*`, `AGENT_ALLOWED_AAD_OBJECT_IDS`, `PUBLIC_SITE_URL`.
-4. Install the bot in Teams and allowlist Entra user object IDs.
+2. Run `server/migrations/005_newsletters.sql` on Azure SQL (newsletter PDF library).
+3. Create Azure OpenAI + Azure Bot (Teams channel); messaging endpoint `https://<hakaru-api>/api/messaging`.
+4. Add App Service settings: `MICROSOFT_APP_*`, `AZURE_OPENAI_*`, `AGENT_ALLOWED_AAD_OBJECT_IDS`, `PUBLIC_SITE_URL`.
+5. Install the bot in Teams and allowlist Entra user object IDs.
 
 ### Local Development
 

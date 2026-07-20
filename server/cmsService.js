@@ -76,6 +76,15 @@ export function detectImageType(buffer) {
   return null;
 }
 
+/** PDF magic header `%PDF` */
+export function detectPdfType(buffer) {
+  if (!buffer || buffer.length < 5) return null;
+  if (buffer.toString('ascii', 0, 4) === '%PDF') {
+    return { ext: 'pdf', mime: 'application/pdf' };
+  }
+  return null;
+}
+
 export async function uploadCmsImage(buffer) {
   if (!isAzureGalleryConfigured()) {
     throw new Error('Azure Blob Storage is not configured');

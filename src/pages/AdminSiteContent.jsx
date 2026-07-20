@@ -13,6 +13,7 @@ const CMS_SLUG_LABELS = {
   events: 'Events page (headings — weekly list uses Home → What’s On)',
   committee: 'Committee',
   donate: 'Donate (titles & intro text)',
+  newsletter: 'Newsletter (page titles & intro text)',
 };
 
 export default function AdminSiteContent() {
@@ -199,6 +200,12 @@ export default function AdminSiteContent() {
               className="rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm text-white hover:bg-white/15"
             >
               Gallery admin
+            </Link>
+            <Link
+              to="/admin/newsletters"
+              className="rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm text-white hover:bg-white/15"
+            >
+              Newsletters
             </Link>
             <Link
               to="/"

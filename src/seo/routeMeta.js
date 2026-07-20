@@ -66,6 +66,11 @@ const BY_PATH = {
     description:
       'Photo galleries from events, commemorations, and life at Hakaru RSA.',
   },
+  '/newsletter': {
+    title: `Newsletter | ${SITE}`,
+    description:
+      'Read past Hakaru RSA newsletters — club news, events, and community updates.',
+  },
   '/donate': {
     title: `Donate | ${SITE}`,
     description:

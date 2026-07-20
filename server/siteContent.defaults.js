@@ -16,6 +16,7 @@ const siteContent = {
       { name: 'Membership', href: '/membership' },
       { name: 'Projects', href: '/projects' },
       { name: 'Gallery', href: '/gallery' },
+      { name: 'Newsletter', href: '/newsletter' },
       { name: 'Donate', href: '/donate' },
       { name: 'Contact', href: '/contact' },
     ],
@@ -200,6 +201,7 @@ We would like to acknowledge & deeply appreciate the fantastic work our voluntee
       { name: 'Membership', href: '/membership' },
       { name: 'Projects', href: '/projects' },
       { name: 'Gallery', href: '/gallery' },
+      { name: 'Newsletter', href: '/newsletter' },
       { name: 'Committee', href: '/committee' },
       { name: 'Contact', href: '/contact' },
     ],
@@ -361,6 +363,16 @@ We would like to acknowledge & deeply appreciate the fantastic work our voluntee
       'Your generous donation has been received. A confirmation email will be sent shortly.',
     successFootnote: 'Transaction reference has been recorded.',
     imageUrl: '',
+  },
+
+  newsletterPage: {
+    pageTitle: 'Newsletter',
+    pageSubtitle: 'News and updates from Hakaru & Districts RSA',
+    introTitle: 'Stay informed',
+    introBody:
+      'Browse our past newsletters for club news, upcoming events, and community updates. New issues are added here as they are published.',
+    listTitle: 'Previous newsletters',
+    emptyMessage: 'No newsletters published yet. Check back soon.',
   },
 };
 

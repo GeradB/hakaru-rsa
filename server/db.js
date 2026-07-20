@@ -687,6 +687,102 @@ export const upsertCmsPatch = async (slug, payloadObj) => {
   }
 };
 
+// --- Newsletters ---
+const mapNewsletterRow = (row) => ({
+  id: row.id,
+  title: row.title,
+  description: row.description,
+  blobName: row.blob_name,
+  publicUrl: row.public_url,
+  publishedAt: row.published_at,
+  isPublished: !!row.is_published,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+export const listPublishedNewsletters = async () => {
+  const pool = await getPool();
+  const result = await pool.request().query(`
+    SELECT id, title, description, blob_name, public_url, published_at, is_published, created_at, updated_at
+    FROM newsletters
+    WHERE is_published = 1
+    ORDER BY COALESCE(published_at, CAST(created_at AS DATE)) DESC, created_at DESC
+  `);
+  return result.recordset.map(mapNewsletterRow);
+};
+
+export const listAllNewsletters = async () => {
+  const pool = await getPool();
+  const result = await pool.request().query(`
+    SELECT id, title, description, blob_name, public_url, published_at, is_published, created_at, updated_at
+    FROM newsletters
+    ORDER BY COALESCE(published_at, CAST(created_at AS DATE)) DESC, created_at DESC
+  `);
+  return result.recordset.map(mapNewsletterRow);
+};
+
+export const getNewsletterById = async (id) => {
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('id', sql.UniqueIdentifier, id)
+    .query(`
+      SELECT id, title, description, blob_name, public_url, published_at, is_published, created_at, updated_at
+      FROM newsletters
+      WHERE id = @id
+    `);
+  const row = result.recordset[0];
+  return row ? mapNewsletterRow(row) : null;
+};
+
+export const createNewsletter = async (data) => {
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('title', sql.NVarChar(255), data.title)
+    .input('description', sql.NVarChar(1000), data.description ?? null)
+    .input('blob_name', sql.NVarChar(500), data.blobName)
+    .input('public_url', sql.NVarChar(2000), data.publicUrl)
+    .input('published_at', sql.Date, data.publishedAt || null)
+    .input('is_published', sql.Bit, data.isPublished === false ? 0 : 1)
+    .query(`
+      INSERT INTO newsletters (title, description, blob_name, public_url, published_at, is_published)
+      OUTPUT INSERTED.id AS id
+      VALUES (@title, @description, @blob_name, @public_url, @published_at, @is_published)
+    `);
+  return result.recordset[0]?.id;
+};
+
+export const updateNewsletter = async (id, data) => {
+  const pool = await getPool();
+  await pool.request()
+    .input('id', sql.UniqueIdentifier, id)
+    .input('title', sql.NVarChar(255), data.title)
+    .input('description', sql.NVarChar(1000), data.description ?? null)
+    .input('published_at', sql.Date, data.publishedAt || null)
+    .input('is_published', sql.Bit, data.isPublished ? 1 : 0)
+    .query(`
+      UPDATE newsletters
+      SET title = @title,
+          description = @description,
+          published_at = @published_at,
+          is_published = @is_published,
+          updated_at = SYSUTCDATETIME()
+      WHERE id = @id
+    `);
+};
+
+/** @returns {Promise<string|null>} blob_name if a row was deleted */
+export const deleteNewsletter = async (id) => {
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('id', sql.UniqueIdentifier, id)
+    .query(`
+      DELETE FROM newsletters
+      OUTPUT DELETED.blob_name AS blob_name
+      WHERE id = @id
+    `);
+  return result.recordset[0]?.blob_name ?? null;
+};
+
 export const insertCmsAgentAudit = async (row) => {
   try {
     const pool = await getPool();

@@ -36,6 +36,12 @@ import {
   createAlbum,
   updateAlbum,
   deleteAlbum,
+  listPublishedNewsletters,
+  listAllNewsletters,
+  getNewsletterById,
+  createNewsletter,
+  updateNewsletter,
+  deleteNewsletter,
 } from './db.js';
 import { uploadGalleryImage, deleteGalleryBlob, isAzureGalleryConfigured } from './galleryBlob.js';
 import { pickFragment, CMS_SLUGS } from './cmsMerge.js';
@@ -43,6 +49,7 @@ import {
   getMergedSiteContentSafe,
   saveFragment,
   detectImageType,
+  detectPdfType,
   uploadCmsImage,
 } from './cmsService.js';
 import { teamsMessagingHandler, isTeamsBotConfigured } from './agent/teamsBot.js';
@@ -1198,6 +1205,180 @@ app.post(
     }
   },
 );
+
+const MAX_NEWSLETTER_UPLOAD_BYTES = 20 * 1024 * 1024;
+const newsletterUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_NEWSLETTER_UPLOAD_BYTES },
+});
+
+const mapNewsletterApi = (item) => ({
+  id: item.id,
+  title: item.title,
+  description: item.description,
+  publicUrl: item.publicUrl,
+  publishedAt: item.publishedAt,
+  isPublished: item.isPublished,
+  createdAt: item.createdAt,
+  updatedAt: item.updatedAt,
+});
+
+// GET /api/newsletters — published issues for public page
+app.get('/api/newsletters', async (_req, res) => {
+  if (!dbConfigured) {
+    return res.json({ items: [] });
+  }
+  try {
+    const items = await listPublishedNewsletters();
+    res.json({ items: items.map(mapNewsletterApi) });
+  } catch (error) {
+    console.error('Error listing newsletters:', error);
+    res.json({ items: [] });
+  }
+});
+
+// GET /api/admin/newsletters
+app.get('/api/admin/newsletters', requireAdmin, async (_req, res) => {
+  if (!dbConfigured) {
+    return res.status(503).json({ error: 'Database is not configured' });
+  }
+  try {
+    const items = await listAllNewsletters();
+    res.json({ items: items.map(mapNewsletterApi) });
+  } catch (error) {
+    console.error('Error listing admin newsletters:', error);
+    res.status(500).json({ error: 'Failed to list newsletters' });
+  }
+});
+
+// POST /api/admin/newsletters/upload
+app.post(
+  '/api/admin/newsletters/upload',
+  requireAdmin,
+  newsletterUpload.single('pdf'),
+  async (req, res) => {
+    if (!dbConfigured) {
+      return res.status(503).json({ error: 'Database is not configured' });
+    }
+    if (!isAzureGalleryConfigured()) {
+      return res.status(503).json({ error: 'Azure Blob Storage is not configured' });
+    }
+
+    const file = req.file;
+    if (!file || !file.buffer?.length) {
+      return res.status(400).json({ error: 'Missing PDF file (field name: pdf)' });
+    }
+
+    const kind = detectPdfType(file.buffer);
+    if (!kind) {
+      return res.status(400).json({ error: 'Invalid file (PDF only)' });
+    }
+
+    const title = String(req.body?.title || '').trim();
+    if (!title) {
+      return res.status(400).json({ error: 'Title is required' });
+    }
+
+    const description = String(req.body?.description || '').trim() || null;
+    const publishedAtRaw = String(req.body?.publishedAt || '').trim();
+    const publishedAt = publishedAtRaw || null;
+    const isPublished = String(req.body?.isPublished || 'true').toLowerCase() !== 'false';
+
+    const now = new Date();
+    const y = now.getUTCFullYear();
+    const m = String(now.getUTCMonth() + 1).padStart(2, '0');
+    const blobName = `newsletters/${y}/${m}/${crypto.randomUUID()}.pdf`;
+
+    let publicUrl;
+    try {
+      publicUrl = await uploadGalleryImage(file.buffer, blobName, kind.mime);
+    } catch (error) {
+      console.error('Newsletter Azure upload failed:', error);
+      return res.status(500).json({ error: 'Upload failed' });
+    }
+
+    try {
+      const id = await createNewsletter({
+        title,
+        description,
+        blobName,
+        publicUrl,
+        publishedAt,
+        isPublished,
+      });
+      if (!id) {
+        await deleteGalleryBlob(blobName).catch(() => {});
+        return res.status(500).json({ error: 'Failed to save newsletter' });
+      }
+      const item = await getNewsletterById(id);
+      res.status(201).json({ success: true, item: mapNewsletterApi(item) });
+    } catch (error) {
+      console.error('Newsletter DB insert failed:', error);
+      await deleteGalleryBlob(blobName).catch(() => {});
+      res.status(500).json({ error: 'Failed to save newsletter' });
+    }
+  },
+);
+
+// PUT /api/admin/newsletters/:id
+app.put('/api/admin/newsletters/:id', requireAdmin, async (req, res) => {
+  if (!dbConfigured) {
+    return res.status(503).json({ error: 'Database is not configured' });
+  }
+  const { id } = req.params;
+  const existing = await getNewsletterById(id);
+  if (!existing) {
+    return res.status(404).json({ error: 'Newsletter not found' });
+  }
+
+  const title = String(req.body?.title ?? existing.title).trim();
+  if (!title) {
+    return res.status(400).json({ error: 'Title is required' });
+  }
+
+  try {
+    await updateNewsletter(id, {
+      title,
+      description:
+        req.body?.description !== undefined
+          ? String(req.body.description || '').trim() || null
+          : existing.description,
+      publishedAt:
+        req.body?.publishedAt !== undefined
+          ? String(req.body.publishedAt || '').trim() || null
+          : existing.publishedAt,
+      isPublished:
+        req.body?.isPublished !== undefined
+          ? !!req.body.isPublished
+          : existing.isPublished,
+    });
+    const item = await getNewsletterById(id);
+    res.json({ success: true, item: mapNewsletterApi(item) });
+  } catch (error) {
+    console.error('Error updating newsletter:', error);
+    res.status(500).json({ error: 'Failed to update newsletter' });
+  }
+});
+
+// DELETE /api/admin/newsletters/:id
+app.delete('/api/admin/newsletters/:id', requireAdmin, async (req, res) => {
+  if (!dbConfigured) {
+    return res.status(503).json({ error: 'Database is not configured' });
+  }
+  try {
+    const blobName = await deleteNewsletter(req.params.id);
+    if (!blobName) {
+      return res.status(404).json({ error: 'Newsletter not found' });
+    }
+    await deleteGalleryBlob(blobName).catch((err) => {
+      console.warn('Newsletter blob delete failed:', err.message || err);
+    });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting newsletter:', error);
+    res.status(500).json({ error: 'Failed to delete newsletter' });
+  }
+});
 
 // --- Teams content agent (Bot Framework) ---
 app.post('/api/messaging', teamsMessagingHandler);
