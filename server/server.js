@@ -59,6 +59,7 @@ import { nzdToMinorUnits, verifyPaidPaymentIntent } from './stripePayments.js';
 import {
   isDataverseConfigured,
   createDataverseMembershipRecord,
+  renewDataverseMembershipByNumber,
 } from './dataverseMembership.js';
 import {
   createDonorDonationEmail,
@@ -726,6 +727,21 @@ app.post('/api/renewal/update-payment', async (req, res) => {
           { ...(formData || {}), fee, donation, total: paymentData.total },
           txnRef,
         );
+
+        // Extend Dataverse membership (non-blocking — payment already succeeded)
+        const memno = formData?.membershipNumber;
+        if (isDataverseConfigured() && memno) {
+          renewDataverseMembershipByNumber(memno).catch((err) => {
+            console.error(
+              `[dataverse] renewal sync failed for memno=${memno} renewal ${renewalId}:`,
+              err.message || err,
+            );
+          });
+        } else if (isDataverseConfigured() && !memno) {
+          console.warn(
+            `[dataverse] skipped renewal sync for ${renewalId}: no membership number on form`,
+          );
+        }
       }
     }
 

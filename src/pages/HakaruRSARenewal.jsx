@@ -555,13 +555,14 @@ export default function HakaruRSARenewal() {
               />
             </Field>
 
-            <Field label="Membership number">
+            <Field label="Membership number" required>
               <input
                 type="text"
                 value={form.membershipNumber}
                 onChange={(e) => set('membershipNumber', e.target.value)}
                 className={inputClass}
-                placeholder="Optional"
+                placeholder="e.g. 1234"
+                required
               />
             </Field>
 
