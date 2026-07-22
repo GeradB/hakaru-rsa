@@ -85,6 +85,11 @@ In the Azure Portal, configure:
    - `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` (SPA app registration IDs)
    - `ADMIN_ALLOWED_AAD_OBJECT_IDS` — comma-separated Entra user object IDs allowed to call `/api/admin/*` (falls back to `AGENT_ALLOWED_AAD_OBJECT_IDS` if set)
 
+5. **Dataverse membership sync (optional)**
+   - Syncs each new membership application to table `cre8c_membershiprecord10` in [org0edbfb3b](https://org0edbfb3b.api.crm6.dynamics.com).
+   - Create an Entra app registration (client secret) and a Dataverse **application user** with a security role that can Create on that table ([docs](https://learn.microsoft.com/power-apps/developer/data-platform/authenticate-oauth#connect-as-an-app)).
+   - App Service settings: `DATAVERSE_URL`, `DATAVERSE_TENANT_ID`, `DATAVERSE_CLIENT_ID`, `DATAVERSE_CLIENT_SECRET` (optional `DATAVERSE_MEMBERSHIP_ENTITY`).
+
 ### Teams content agent (optional)
 
 See [docs/CONTENT_AGENT.md](docs/CONTENT_AGENT.md) for full setup. Summary:

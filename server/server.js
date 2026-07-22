@@ -57,6 +57,10 @@ import { verifyEntraIdToken } from './entraAuth.js';
 import { buildSafeWwwRedirect } from './apexRedirect.js';
 import { nzdToMinorUnits, verifyPaidPaymentIntent } from './stripePayments.js';
 import {
+  isDataverseConfigured,
+  createDataverseMembershipRecord,
+} from './dataverseMembership.js';
+import {
   createDonorDonationEmail,
   createAdminDonationEmail,
   createMembershipConfirmationEmail,
@@ -524,6 +528,16 @@ app.post('/api/membership/submit', async (req, res) => {
       const membershipId = await createMembership(formData);
 
       console.log(`Membership created in database: ${membershipId} for ${formData.email}`);
+
+      // Sync to Dataverse (non-blocking — website signup must not fail if CRM is down)
+      if (isDataverseConfigured()) {
+        createDataverseMembershipRecord(formData, membershipId).catch((err) => {
+          console.error(
+            `[dataverse] sync failed for membership ${membershipId}:`,
+            err.message || err,
+          );
+        });
+      }
 
       res.json({
         success: true,
