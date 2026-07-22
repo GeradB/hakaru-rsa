@@ -53,9 +53,12 @@ export async function verifyEntraIdToken(token) {
   }
 
   const allowed = getAdminAllowedObjectIds();
+  // Require allowlist in production, Azure App Service, or when explicitly forced
   const allowlistRequired =
     process.env.NODE_ENV === 'production' ||
-    process.env.ADMIN_REQUIRE_ALLOWLIST === 'true';
+    process.env.ADMIN_REQUIRE_ALLOWLIST === 'true' ||
+    !!process.env.WEBSITE_INSTANCE_ID ||
+    !!process.env.WEBSITE_SITE_NAME;
 
   if (!allowed.length && allowlistRequired) {
     const err = new Error(
