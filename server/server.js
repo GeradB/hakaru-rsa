@@ -268,8 +268,14 @@ const createTransporter = () => {
 
 // Helper to send emails with error handling
 const sendEmail = async (to, subject, html) => {
-  const toNorm = typeof to === 'string' ? to.trim() : '';
-  if (!toNorm || !toNorm.includes('@')) {
+  const recipients = (Array.isArray(to) ? to : String(to || '').split(','))
+    .map((s) => String(s || '').trim())
+    .filter((s) => s.includes('@'));
+  const unique = [...new Set(recipients.map((s) => s.toLowerCase()))].map((lower) =>
+    recipients.find((r) => r.toLowerCase() === lower),
+  );
+  const toNorm = unique.join(', ');
+  if (!toNorm) {
     console.error(`[email] skip send: invalid or missing recipient (${JSON.stringify(to)})`);
     return false;
   }
@@ -294,6 +300,16 @@ const sendEmail = async (to, subject, html) => {
     console.error(`Failed to send email to ${toNorm}:`, error.message);
     return false;
   }
+};
+
+/** Admin alerts: EMAIL_TO (comma-separated) plus membership secretary. */
+const MEMBERSHIP_SECRETARY_EMAIL = 'memsec@hakarursa.co.nz';
+const getAdminNotificationRecipients = () => {
+  const fromEnv = (process.env.EMAIL_TO || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.includes('@'));
+  return [...new Set([...fromEnv, MEMBERSHIP_SECRETARY_EMAIL].map((e) => e.toLowerCase()))];
 };
 
 // Generate unique transaction reference
@@ -402,7 +418,7 @@ const sendDonationEmails = async (formData, transactionRef, paidAt) => {
       transactionRef,
       paidAt,
     });
-    await sendEmail(process.env.EMAIL_TO, adminEmail.subject, adminEmail.html);
+    await sendEmail(getAdminNotificationRecipients(), adminEmail.subject, adminEmail.html);
   } catch (error) {
     console.error('Error sending donation emails:', error);
   }
@@ -434,7 +450,7 @@ const sendMembershipEmails = async (formData, transactionRef) => {
       ...formData,
       transactionRef,
     });
-    await sendEmail(process.env.EMAIL_TO, adminEmail.subject, adminEmail.html);
+    await sendEmail(getAdminNotificationRecipients(), adminEmail.subject, adminEmail.html);
   } catch (error) {
     console.error('Error sending membership emails:', error);
   }
@@ -470,7 +486,7 @@ const sendRenewalEmails = async (formData, transactionRef) => {
       total,
       transactionRef,
     });
-    await sendEmail(process.env.EMAIL_TO, adminEmail.subject, adminEmail.html);
+    await sendEmail(getAdminNotificationRecipients(), adminEmail.subject, adminEmail.html);
   } catch (error) {
     console.error('Error sending renewal emails:', error);
   }
