@@ -21,6 +21,11 @@ const baseStyles = {
   button: 'display: inline-block; background: #fbbf24; color: #1a365d; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 15px;',
 };
 
+function formatMoney(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toFixed(2) : '0.00';
+}
+
 /**
  * Generate donation confirmation email for donor
  */
@@ -286,9 +291,9 @@ export function createAdminDonationEmail(data) {
 export function createMembershipConfirmationEmail(data) {
   const { fullName, fullName2, email, membershipType, fee, donation, total, transactionRef, mailingAddress, mailingTown, mailingPostCode } = data;
 
-  const displayFee = typeof fee === 'number' ? fee.toFixed(2) : String(fee || 0);
-  const displayDonation = typeof donation === 'number' ? donation.toFixed(2) : String(donation || 0);
-  const displayTotal = typeof total === 'number' ? total.toFixed(2) : String(total || 0);
+  const displayFee = formatMoney(fee);
+  const displayDonation = formatMoney(donation);
+  const displayTotal = formatMoney(total);
   const applicantName = fullName2 ? `${fullName} & ${fullName2}` : fullName;
 
   return {
@@ -424,9 +429,9 @@ export function createAdminMembershipEmail(data) {
     fee, donation, total, transactionRef
   } = data;
 
-  const displayFee = typeof fee === 'number' ? fee.toFixed(2) : String(fee || 0);
-  const displayDonation = typeof donation === 'number' ? donation.toFixed(2) : String(donation || 0);
-  const displayTotal = typeof total === 'number' ? total.toFixed(2) : String(total || 0);
+  const displayFee = formatMoney(fee);
+  const displayDonation = formatMoney(donation);
+  const displayTotal = formatMoney(total);
   const applicantName = fullName2 ? `${fullName} & ${fullName2}` : fullName;
 
   return {
@@ -683,9 +688,9 @@ export function createAdminMembershipEmail(data) {
 export function createRenewalConfirmationEmail(data) {
   const { fullName, email, membershipType, fee, donation, total, transactionRef, mailingAddress, mailingTown, mailingPostCode } = data;
 
-  const displayFee = typeof fee === 'number' ? fee.toFixed(2) : String(fee || 0);
-  const displayDonation = typeof donation === 'number' ? donation.toFixed(2) : String(donation || 0);
-  const displayTotal = typeof total === 'number' ? total.toFixed(2) : String(total || 0);
+  const displayFee = formatMoney(fee);
+  const displayDonation = formatMoney(donation);
+  const displayTotal = formatMoney(total);
 
   return {
     subject: `Membership Renewal Confirmed - Hakaru & Districts RSA`,
@@ -801,9 +806,9 @@ export function createRenewalConfirmationEmail(data) {
 export function createAdminRenewalEmail(data) {
   const { fullName, email, mobile, homePhone, mailingAddress, mailingTown, mailingPostCode, membershipType, consentEmail, consentAGM, fee, donation, total, transactionRef } = data;
 
-  const displayFee = typeof fee === 'number' ? fee.toFixed(2) : String(fee || 0);
-  const displayDonation = typeof donation === 'number' ? donation.toFixed(2) : String(donation || 0);
-  const displayTotal = typeof total === 'number' ? total.toFixed(2) : String(total || 0);
+  const displayFee = formatMoney(fee);
+  const displayDonation = formatMoney(donation);
+  const displayTotal = formatMoney(total);
 
   return {
     subject: `Membership Renewal: ${fullName} (${membershipType})`,

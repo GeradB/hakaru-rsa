@@ -585,6 +585,13 @@ app.post('/api/membership/update-payment', async (req, res) => {
     });
     const status = verified.status;
 
+    const donationAmt = Number.parseFloat(formData?.donation) || 0;
+    // memberships table has amount_paid + donation, not fee/total — derive from Stripe
+    const totalAmt =
+      verified.amountNzd != null
+        ? Number(verified.amountNzd)
+        : Number(amount) || 0;
+
     const paymentData = {
       stripePaymentIntentId: verified.id,
       paymentStatus: status,
@@ -601,11 +608,16 @@ app.post('/api/membership/update-payment', async (req, res) => {
         const membership = await getMembership(membershipId);
         if (membership) {
           const txnRef = membership.stripe_payment_intent_id || membershipId;
+          const paidTotal =
+            membership.amount_paid != null ? Number(membership.amount_paid) : totalAmt;
+          const paidDonation =
+            membership.donation != null ? Number(membership.donation) : donationAmt;
+          const paidFee = Math.max(0, Math.round((paidTotal - paidDonation) * 100) / 100);
           await sendMembershipEmails({
             ...formData,
-            fee: membership.fee,
-            donation: membership.donation,
-            total: membership.total,
+            fee: paidFee,
+            donation: paidDonation,
+            total: paidTotal,
           }, txnRef);
         }
       }
