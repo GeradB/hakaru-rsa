@@ -86,7 +86,7 @@ In the Azure Portal, configure:
    - `ADMIN_ALLOWED_AAD_OBJECT_IDS` — comma-separated Entra user object IDs allowed to call `/api/admin/*` (falls back to `AGENT_ALLOWED_AAD_OBJECT_IDS` if set)
 
 5. **Dataverse membership sync (optional)**
-   - **New applications:** creates a row in `cre8c_membershiprecord10` in [org0edbfb3b](https://org0edbfb3b.api.crm6.dynamics.com).
+   - **New applications:** creates a row in `cre8c_membershiprecord10` in [org0edbfb3b](https://org0edbfb3b.api.crm6.dynamics.com). If Applicant 2 (`fullName2`) is filled, a second row is created for them (shared address/contact/type; their own name/DOB).
    - **Renewals (after successful payment):** looks up `cre8c_membershipnumber` from the form memno, sets `cre8c_membershipstatus` to Active, and sets `cre8c_membershipexpirydate` to current expiry + 1 year (or now + 1 year if expiry is blank).
    - Create an Entra app registration (client secret) and a Dataverse **application user** with a security role that can Create/Write on that table ([docs](https://learn.microsoft.com/power-apps/developer/data-platform/authenticate-oauth#connect-as-an-app)).
    - App Service settings: `DATAVERSE_URL`, `DATAVERSE_TENANT_ID`, `DATAVERSE_CLIENT_ID`, `DATAVERSE_CLIENT_SECRET` (optional `DATAVERSE_MEMBERSHIP_ENTITY`).

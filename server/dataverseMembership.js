@@ -228,82 +228,113 @@ function splitFullName(fullName) {
 }
 
 /**
- * Map website membership form → Dataverse row (only attributes that exist).
+ * Build the form slice for applicant 1 or joint applicant 2.
+ * Applicant 2 uses fullName2/dob2 and shares household contact/address/type.
  */
-export function mapMembershipToDataverse(formData, membershipId, meta) {
+export function formDataForApplicant(formData, applicant = 'primary') {
+  const base = formData || {};
+  if (applicant !== 'joint') {
+    return base;
+  }
+  return {
+    ...base,
+    fullName: base.fullName2,
+    dob: base.dob2 || null,
+    fullName2: undefined,
+    dob2: undefined,
+    // Service history on the form is for applicant 1 only
+    serviceName: undefined,
+    serviceDob: undefined,
+    servicesBranch: undefined,
+    serviceType: undefined,
+    tradeCorp: undefined,
+    serviceNumber: undefined,
+    rank: undefined,
+    confirmationMilitary: undefined,
+    yearEnlisted: undefined,
+    yearDischarged: undefined,
+    wherServed: undefined,
+  };
+}
+
+/**
+ * Map website membership form → Dataverse row (only attributes that exist).
+ * @param {'primary'|'joint'} [options.applicant]
+ */
+export function mapMembershipToDataverse(formData, membershipId, meta, options = {}) {
+  const applicant = options.applicant === 'joint' ? 'joint' : 'primary';
+  const data = formDataForApplicant(formData, applicant);
   const attrs = meta.attributes;
   const payload = {};
-  const { firstName, lastName } = splitFullName(formData.fullName);
+  const { firstName, lastName } = splitFullName(data.fullName);
 
   const primary = meta.primaryNameAttribute;
-  if (primary && formData.fullName) {
+  if (primary && data.fullName) {
     // Primary on this table is cre8c_firstname — prefer first name there.
     if (primary.toLowerCase() === 'cre8c_firstname' && firstName) {
       payload[primary] = firstName;
     } else {
-      payload[primary] = String(formData.fullName);
+      payload[primary] = String(data.fullName);
     }
   }
 
   setIf(payload, attrs, ['cre8c_firstname'], firstName);
   setIf(payload, attrs, ['cre8c_lastname'], lastName);
-  setIf(payload, attrs, ['cre8c_name', 'cre8c_fullname', 'cre8c_membername'], formData.fullName);
-  setIf(payload, attrs, ['cre8c_fullname2', 'cre8c_partnername', 'cre8c_secondname'], formData.fullName2);
+  setIf(payload, attrs, ['cre8c_name', 'cre8c_fullname', 'cre8c_membername'], data.fullName);
   setIf(
     payload,
     attrs,
     ['cre8c_emailaddress', 'cre8c_email', 'emailaddress1', 'email'],
-    formData.email,
+    data.email,
   );
   setIf(
     payload,
     attrs,
     ['cre8c_mobilephone', 'cre8c_mobile', 'cre8c_mobilenumber', 'mobilephone', 'telephone2'],
-    formData.mobile,
+    data.mobile,
   );
-  setIf(payload, attrs, ['cre8c_homephone', 'cre8c_phone', 'telephone1', 'homephone'], formData.homePhone);
-  setIf(payload, attrs, ['cre8c_workphone'], formData.homePhone);
-  setIf(payload, attrs, ['cre8c_dob', 'cre8c_dateofbirth', 'birthdate'], formData.dob);
-  setIf(payload, attrs, ['cre8c_dob2', 'cre8c_partnerdob'], formData.dob2);
+  setIf(payload, attrs, ['cre8c_homephone', 'cre8c_phone', 'telephone1', 'homephone'], data.homePhone);
+  setIf(payload, attrs, ['cre8c_workphone'], data.homePhone);
+  setIf(payload, attrs, ['cre8c_dob', 'cre8c_dateofbirth', 'birthdate'], data.dob);
   setIf(
     payload,
     attrs,
     ['cre8c_postaladdress', 'cre8c_mailingaddress', 'cre8c_address', 'address1_line1'],
-    formData.mailingAddress,
+    data.mailingAddress,
   );
-  setIf(payload, attrs, ['cre8c_streetname'], formData.mailingAddress);
+  setIf(payload, attrs, ['cre8c_streetname'], data.mailingAddress);
   setIf(
     payload,
     attrs,
     ['cre8c_suburb', 'cre8c_mailingtown', 'cre8c_town', 'address1_city'],
-    formData.mailingTown,
+    data.mailingTown,
   );
-  setIf(payload, attrs, ['cre8c_city'], formData.mailingTown);
+  setIf(payload, attrs, ['cre8c_city'], data.mailingTown);
   setIf(
     payload,
     attrs,
     ['cre8c_postcode', 'cre8c_mailingpostcode', 'address1_postalcode'],
-    formData.mailingPostCode,
+    data.mailingPostCode,
   );
   setIf(payload, attrs, ['cre8c_country'], 'New Zealand');
-  setIf(payload, attrs, ['cre8c_physicaladdress', 'address2_line1'], formData.physicalAddress);
-  setIf(payload, attrs, ['cre8c_physicaltown', 'address2_city'], formData.physicalTown);
-  setIf(payload, attrs, ['cre8c_physicalpostcode', 'address2_postalcode'], formData.physicalPostCode);
-  setIf(payload, attrs, ['cre8c_membershiptype', 'cre8c_type'], formData.membershipType);
+  setIf(payload, attrs, ['cre8c_physicaladdress', 'address2_line1'], data.physicalAddress);
+  setIf(payload, attrs, ['cre8c_physicaltown', 'address2_city'], data.physicalTown);
+  setIf(payload, attrs, ['cre8c_physicalpostcode', 'address2_postalcode'], data.physicalPostCode);
+  setIf(payload, attrs, ['cre8c_membershiptype', 'cre8c_type'], data.membershipType);
   setIf(payload, attrs, ['cre8c_membershipstatus'], 'Active');
   setIf(payload, attrs, ['cre8c_datejoined'], new Date().toISOString());
-  setIf(payload, attrs, ['cre8c_transferfrom'], formData.transferFrom);
-  setIf(payload, attrs, ['cre8c_service', 'cre8c_servicename'], formData.serviceName);
-  setIf(payload, attrs, ['cre8c_serviceno', 'cre8c_servicenumber'], formData.serviceNumber);
-  setIf(payload, attrs, ['cre8c_rank'], formData.rank);
-  setIf(payload, attrs, ['cre8c_tradecorp'], formData.tradeCorp);
-  setIf(payload, attrs, ['cre8c_yearenlisted'], formData.yearEnlisted);
-  setIf(payload, attrs, ['cre8c_yeardischarged'], formData.yearDischarged);
-  setIf(payload, attrs, ['cre8c_whereserved'], formData.wherServed);
-  setIf(payload, attrs, ['cre8c_nominatedby'], formData.nominatedBy);
-  setIf(payload, attrs, ['cre8c_secondedby'], formData.secondedBy);
-  setIf(payload, attrs, ['cre8c_donation', 'cre8c_donationamount'], formData.donation);
-  setIf(payload, attrs, ['cre8c_skills'], formData.skills);
+  setIf(payload, attrs, ['cre8c_transferfrom'], data.transferFrom);
+  setIf(payload, attrs, ['cre8c_service', 'cre8c_servicename'], data.serviceName);
+  setIf(payload, attrs, ['cre8c_serviceno', 'cre8c_servicenumber'], data.serviceNumber);
+  setIf(payload, attrs, ['cre8c_rank'], data.rank);
+  setIf(payload, attrs, ['cre8c_tradecorp'], data.tradeCorp);
+  setIf(payload, attrs, ['cre8c_yearenlisted'], data.yearEnlisted);
+  setIf(payload, attrs, ['cre8c_yeardischarged'], data.yearDischarged);
+  setIf(payload, attrs, ['cre8c_whereserved'], data.wherServed);
+  setIf(payload, attrs, ['cre8c_nominatedby'], data.nominatedBy);
+  setIf(payload, attrs, ['cre8c_secondedby'], data.secondedBy);
+  setIf(payload, attrs, ['cre8c_donation', 'cre8c_donationamount'], data.donation);
+  setIf(payload, attrs, ['cre8c_skills'], data.skills);
   // Do not write website UUIDs into cre8c_membershipnumber — that column is the RSA memno.
   setIf(
     payload,
@@ -315,31 +346,24 @@ export function mapMembershipToDataverse(formData, membershipId, meta) {
     payload,
     attrs,
     ['cre8c_servicesbranch'],
-    formData.servicesBranch ? JSON.stringify(formData.servicesBranch) : null,
+    data.servicesBranch ? JSON.stringify(data.servicesBranch) : null,
   );
   setIf(
     payload,
     attrs,
     ['cre8c_servicetype'],
-    formData.serviceType ? JSON.stringify(formData.serviceType) : null,
+    data.serviceType ? JSON.stringify(data.serviceType) : null,
   );
 
   return payload;
 }
 
-/**
- * Create a Dataverse membership row. Returns record id or null if not configured.
- * Errors are thrown to the caller (caller should catch and log).
- */
-export async function createDataverseMembershipRecord(formData, membershipId) {
-  if (!isDataverseConfigured()) {
-    return null;
-  }
-
-  const meta = await getMembershipEntityMeta();
-  const payload = mapMembershipToDataverse(formData || {}, membershipId, meta);
+async function postMembershipRecord(formData, membershipId, meta, applicant) {
+  const payload = mapMembershipToDataverse(formData || {}, membershipId, meta, { applicant });
   if (!Object.keys(payload).length) {
-    throw new Error('Dataverse payload empty — no matching columns for membership fields');
+    throw new Error(
+      `Dataverse payload empty for ${applicant} — no matching columns for membership fields`,
+    );
   }
 
   const res = await dataverseFetch(`/${meta.entitySetName}`, {
@@ -349,16 +373,38 @@ export async function createDataverseMembershipRecord(formData, membershipId) {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Dataverse create failed (${res.status}): ${text.slice(0, 500)}`);
+    throw new Error(
+      `Dataverse create failed (${res.status}) for ${applicant}: ${text.slice(0, 500)}`,
+    );
   }
 
   const created = await res.json().catch(() => ({}));
   const idKey = Object.keys(created).find((k) => k.endsWith('id') && k !== '@odata.context');
   const recordId = idKey ? created[idKey] : null;
   console.log(
-    `[dataverse] created ${meta.entitySetName} id=${recordId || 'unknown'} for membership ${membershipId}`,
+    `[dataverse] created ${meta.entitySetName} id=${recordId || 'unknown'} applicant=${applicant} for membership ${membershipId}`,
   );
   return recordId;
+}
+
+/**
+ * Create Dataverse membership row(s). When Applicant 2 (fullName2) is set, creates a
+ * second row for the joint applicant. Returns { primaryId, jointId } or null if not configured.
+ */
+export async function createDataverseMembershipRecord(formData, membershipId) {
+  if (!isDataverseConfigured()) {
+    return null;
+  }
+
+  const meta = await getMembershipEntityMeta();
+  const primaryId = await postMembershipRecord(formData, membershipId, meta, 'primary');
+
+  let jointId = null;
+  if (String(formData?.fullName2 || '').trim()) {
+    jointId = await postMembershipRecord(formData, membershipId, meta, 'joint');
+  }
+
+  return { primaryId, jointId };
 }
 
 /**

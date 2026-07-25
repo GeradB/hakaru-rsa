@@ -98,6 +98,43 @@ describe('mapMembershipToDataverse', () => {
     assert.equal(payload.cre8c_membershiptype, 0);
     assert.equal(payload.cre8c_membershipstatus, 1);
   });
+
+  it('maps joint applicant 2 name and dob onto their own row', () => {
+    const attrs = new Map([
+      ['cre8c_firstname', { LogicalName: 'cre8c_firstname', AttributeType: 'String' }],
+      ['cre8c_lastname', { LogicalName: 'cre8c_lastname', AttributeType: 'String' }],
+      ['cre8c_dob', { LogicalName: 'cre8c_dob', AttributeType: 'DateTime' }],
+      ['cre8c_emailaddress', { LogicalName: 'cre8c_emailaddress', AttributeType: 'String' }],
+      ['cre8c_service', { LogicalName: 'cre8c_service', AttributeType: 'String' }],
+    ]);
+    const form = {
+      fullName: 'Ross McAulay',
+      fullName2: 'Sara McAulay',
+      dob: '1960-01-01',
+      dob2: '1962-05-15',
+      email: 'saramcaulay@slingshot.co.nz',
+      serviceName: 'Army',
+    };
+    const primary = mapMembershipToDataverse(form, 'mid', {
+      primaryNameAttribute: 'cre8c_firstname',
+      attributes: attrs,
+    });
+    assert.equal(primary.cre8c_firstname, 'Ross');
+    assert.equal(primary.cre8c_lastname, 'McAulay');
+    assert.equal(primary.cre8c_service, 'Army');
+
+    const joint = mapMembershipToDataverse(
+      form,
+      'mid',
+      { primaryNameAttribute: 'cre8c_firstname', attributes: attrs },
+      { applicant: 'joint' },
+    );
+    assert.equal(joint.cre8c_firstname, 'Sara');
+    assert.equal(joint.cre8c_lastname, 'McAulay');
+    assert.equal(joint.cre8c_emailaddress, 'saramcaulay@slingshot.co.nz');
+    assert.equal(joint.cre8c_dob, '1962-05-15T00:00:00.000Z');
+    assert.equal(joint.cre8c_service, undefined);
+  });
 });
 
 describe('computeRenewalExpiry', () => {
