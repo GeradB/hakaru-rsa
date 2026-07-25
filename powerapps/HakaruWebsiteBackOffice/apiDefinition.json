@@ -1,0 +1,166 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Hakaru RSA Website Back Office",
+    "description": "Read membership applications, renewals, and donations from the Hakaru website API.",
+    "version": "1.0.0"
+  },
+  "host": "hakaru-api-fyfrgkgmh9a3c7gt.australiaeast-01.azurewebsites.net",
+  "basePath": "/",
+  "schemes": ["https"],
+  "consumes": ["application/json"],
+  "produces": ["application/json"],
+  "securityDefinitions": {
+    "api_key": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "X-Admin-Api-Key"
+    }
+  },
+  "security": [{ "api_key": [] }],
+  "paths": {
+    "/api/admin/memberships": {
+      "get": {
+        "operationId": "ListMembershipApplications",
+        "summary": "List membership applications",
+        "description": "Returns recent membership applications from the website database.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "default": 100,
+            "description": "Max rows (1-500)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "type": "boolean" },
+                "items": {
+                  "type": "array",
+                  "items": { "$ref": "#/definitions/MembershipApplication" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/renewals": {
+      "get": {
+        "operationId": "ListMembershipRenewals",
+        "summary": "List membership renewals",
+        "description": "Returns recent membership renewals from the website database.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "default": 100
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "type": "boolean" },
+                "items": {
+                  "type": "array",
+                  "items": { "$ref": "#/definitions/MembershipRenewal" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/donations": {
+      "get": {
+        "operationId": "ListDonations",
+        "summary": "List donations",
+        "description": "Returns recent donations from the website database.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "type": "integer",
+            "default": 100
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": { "type": "boolean" },
+                "items": {
+                  "type": "array",
+                  "items": { "$ref": "#/definitions/Donation" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "MembershipApplication": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "created_at": { "type": "string" },
+        "status": { "type": "string" },
+        "full_name": { "type": "string" },
+        "full_name2": { "type": "string" },
+        "email": { "type": "string" },
+        "mobile": { "type": "string" },
+        "membership_type": { "type": "string" },
+        "amount_paid": { "type": "number" },
+        "payment_status": { "type": "string" },
+        "paid_at": { "type": "string" }
+      }
+    },
+    "MembershipRenewal": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "created_at": { "type": "string" },
+        "status": { "type": "string" },
+        "full_name": { "type": "string" },
+        "membership_number": { "type": "string" },
+        "email": { "type": "string" },
+        "membership_type": { "type": "string" },
+        "fee_amount": { "type": "number" },
+        "total_amount": { "type": "number" },
+        "amount_paid": { "type": "number" },
+        "payment_status": { "type": "string" }
+      }
+    },
+    "Donation": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "created_at": { "type": "string" },
+        "status": { "type": "string" },
+        "full_name": { "type": "string" },
+        "email": { "type": "string" },
+        "amount": { "type": "number" },
+        "amount_paid": { "type": "number" },
+        "timing": { "type": "string" },
+        "is_anonymous": { "type": "boolean" },
+        "payment_status": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "properties": {
+    "connectionParameters": {
+      "api_key": {
+        "type": "securestring",
+        "uiDefinition": {
+          "displayName": "Admin API Key",
+          "description": "Value of ADMIN_API_KEY from hakaru-api App Service settings (header X-Admin-Api-Key).",
+          "tooltip": "Paste the Hakaru website ADMIN_API_KEY",
+          "constraints": {
+            "tabIndex": 2,
+            "clearText": false,
+            "required": "true"
+          }
+        }
+      }
+    },
+    "iconBrandColor": "#1a365d",
+    "capabilities": [],
+    "scriptOperations": null,
+    "publisher": "Hakaru & Districts RSA",
+    "stackOwner": "Hakaru & Districts RSA"
+  }
+}

@@ -18,6 +18,9 @@ import {
   createMembership,
   updateMembership,
   getMembership,
+  listMemberships,
+  listRenewals,
+  listDonations,
   listPublishedGalleryItems,
   listAllGalleryItems,
   getGalleryItemById,
@@ -188,6 +191,14 @@ const checkLoginRateLimit = (ip) => {
 };
 
 const requireAdmin = async (req, res, next) => {
+  // Power Apps / custom connector API key (header: X-Admin-Api-Key)
+  const configuredApiKey = process.env.ADMIN_API_KEY?.trim();
+  const providedApiKey = req.headers['x-admin-api-key'];
+  if (configuredApiKey && providedApiKey && providedApiKey === configuredApiKey) {
+    req.user = { authType: 'api_key' };
+    return next();
+  }
+
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const idToken = authHeader.substring(7);
@@ -848,6 +859,48 @@ app.get('/api/gallery', async (_req, res) => {
   } catch (error) {
     console.error('Error listing gallery:', error);
     res.json({ items: [] });
+  }
+});
+
+// GET /api/admin/memberships — back-office list (Power Apps / admin UI)
+app.get('/api/admin/memberships', requireAdmin, async (req, res) => {
+  try {
+    if (!dbConfigured) {
+      return res.status(503).json({ error: 'Database is not configured' });
+    }
+    const items = await listMemberships(req.query.limit);
+    res.json({ success: true, items });
+  } catch (error) {
+    console.error('Error listing memberships:', error);
+    res.status(500).json({ error: 'Failed to list memberships' });
+  }
+});
+
+// GET /api/admin/renewals
+app.get('/api/admin/renewals', requireAdmin, async (req, res) => {
+  try {
+    if (!dbConfigured) {
+      return res.status(503).json({ error: 'Database is not configured' });
+    }
+    const items = await listRenewals(req.query.limit);
+    res.json({ success: true, items });
+  } catch (error) {
+    console.error('Error listing renewals:', error);
+    res.status(500).json({ error: 'Failed to list renewals' });
+  }
+});
+
+// GET /api/admin/donations
+app.get('/api/admin/donations', requireAdmin, async (req, res) => {
+  try {
+    if (!dbConfigured) {
+      return res.status(503).json({ error: 'Database is not configured' });
+    }
+    const items = await listDonations(req.query.limit);
+    res.json({ success: true, items });
+  } catch (error) {
+    console.error('Error listing donations:', error);
+    res.status(500).json({ error: 'Failed to list donations' });
   }
 });
 

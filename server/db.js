@@ -205,6 +205,65 @@ export const getMembership = async (id) => {
   return result.recordset[0] || null;
 };
 
+/** List membership applications for back-office (newest first). */
+export const listMemberships = async (limit = 100) => {
+  const pool = await getPool();
+  const top = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 500);
+  const result = await pool.request().query(`
+    SELECT TOP (${top})
+      id, created_at, updated_at, status,
+      full_name, full_name2, dob, dob2,
+      mailing_address, mailing_town, mailing_postcode,
+      physical_address, physical_town, physical_postcode,
+      home_phone, mobile, email,
+      membership_type, transfer_from,
+      consent_email, consent_agm, consent_womens,
+      skills, willing_tasks, willing_working_bee, willing_donate,
+      service_name, service_number, rank,
+      nominated_by, seconded_by, donation,
+      stripe_payment_intent_id, payment_status, amount_paid, paid_at
+    FROM memberships
+    ORDER BY created_at DESC
+  `);
+  return result.recordset;
+};
+
+/** List membership renewals for back-office (newest first). */
+export const listRenewals = async (limit = 100) => {
+  const pool = await getPool();
+  const top = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 500);
+  const result = await pool.request().query(`
+    SELECT TOP (${top})
+      id, created_at, updated_at, status,
+      full_name, membership_number, dob, email, home_phone, mobile,
+      mailing_address, mailing_town, mailing_postcode,
+      physical_address, physical_town, physical_postcode,
+      consent_email, consent_agm, consent_womens,
+      membership_type, donation, fee_amount, total_amount,
+      stripe_payment_intent_id, payment_status, amount_paid, paid_at
+    FROM membership_renewals
+    ORDER BY created_at DESC
+  `);
+  return result.recordset;
+};
+
+/** List donations for back-office (newest first). */
+export const listDonations = async (limit = 100) => {
+  const pool = await getPool();
+  const top = Math.min(Math.max(parseInt(limit, 10) || 100, 1), 500);
+  const result = await pool.request().query(`
+    SELECT TOP (${top})
+      id, created_at, updated_at, status,
+      amount, timing, interval, donor_type, is_anonymous,
+      full_name, organisation_name, email, phone, mobile,
+      mailing_address, mailing_town, mailing_postcode,
+      stripe_payment_intent_id, payment_status, amount_paid, paid_at
+    FROM donations
+    ORDER BY created_at DESC
+  `);
+  return result.recordset;
+};
+
 export const listPublishedGalleryItems = async (albumId = null) => {
   const pool = await getPool();
   const query = `
