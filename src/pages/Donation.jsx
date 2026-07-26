@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { apiUrl, fetchApiJson } from '../apiBase';
+import { mapNominatimResult } from '../lib/nominatimAddress';
 import { getStripe } from '../lib/stripe';
 import { useSiteContent } from '../context/SiteContentContext';
 
@@ -297,19 +298,7 @@ export default function Donation() {
       const response = await fetch(apiUrl(`/api/address/lookup?q=${encodeURIComponent(query)}`));
       const data = await response.json();
       if (Array.isArray(data)) {
-        setAddressResults(
-          data.map((item) => ({
-            id: item.place_id,
-            fullAddress: item.display_name,
-            street:
-              item.address?.road ||
-              item.address?.pedestrian ||
-              item.address?.street ||
-              '',
-            town: item.address?.town || item.address?.city || item.address?.suburb || '',
-            postcode: item.address?.postcode || '',
-          })),
-        );
+        setAddressResults(data.map(mapNominatimResult));
         setShowAddressResults(true);
       }
     } catch (e) {

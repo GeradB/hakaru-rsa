@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
+import { mapNominatimResult } from '../lib/nominatimAddress';
 import { getStripe } from '../lib/stripe';
 
 const MEMBERSHIP_FEES = {
@@ -297,19 +298,7 @@ export default function HakaruRSARenewal() {
       const data = await response.json();
 
       if (Array.isArray(data)) {
-        setAddressResults(
-          data.map((item) => ({
-            id: item.place_id,
-            fullAddress: item.display_name,
-            street:
-              item.address?.road ||
-              item.address?.pedestrian ||
-              item.address?.street ||
-              "",
-            town: item.address?.town || item.address?.city || item.address?.suburb || "",
-            postcode: item.address?.postcode || "",
-          }))
-        );
+        setAddressResults(data.map(mapNominatimResult));
         setShowAddressResults(true);
       }
     } catch (error) {
@@ -344,19 +333,7 @@ export default function HakaruRSARenewal() {
       const data = await response.json();
 
       if (Array.isArray(data)) {
-        setPhysicalAddressResults(
-          data.map((item) => ({
-            id: item.place_id,
-            fullAddress: item.display_name,
-            street:
-              item.address?.road ||
-              item.address?.pedestrian ||
-              item.address?.street ||
-              "",
-            town: item.address?.town || item.address?.city || item.address?.suburb || "",
-            postcode: item.address?.postcode || "",
-          })),
-        );
+        setPhysicalAddressResults(data.map(mapNominatimResult));
         setShowPhysicalAddressResults(true);
       }
     } catch (error) {
