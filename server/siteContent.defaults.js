@@ -195,7 +195,7 @@ We would like to acknowledge & deeply appreciate the fantastic work our voluntee
   },
 
   footer: {
-    copyright: '© 2026 Hakaru & Districts RSA. All rights reserved.',
+    copyright: '\u00A9 2026 Hakaru & Districts RSA. All rights reserved.',
     quickLinks: [
       { name: 'Home', href: '/' },
       { name: 'About', href: '/about' },

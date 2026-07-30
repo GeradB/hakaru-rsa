@@ -71,7 +71,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400 text-sm">
-          {footer.copyright}
+          {(footer.copyright || '').replace(/^\?\s*/, '\u00A9 ')}
         </div>
       </div>
     </footer>
