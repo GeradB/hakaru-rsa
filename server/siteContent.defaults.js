@@ -181,7 +181,7 @@ We would like to acknowledge & deeply appreciate the fantastic work our voluntee
       city: 'KAIWAKA 0573',
     },
     phone: '09 431 2176',
-    email: 'info@hakarursa.co.nz',
+    email: 'secretary@hakarursa.co.nz',
     hours: {
       title: 'Opening Hours',
       items: [
