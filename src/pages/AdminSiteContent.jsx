@@ -14,6 +14,7 @@ const CMS_SLUG_LABELS = {
   committee: 'Committee',
   donate: 'Donate (titles & intro text)',
   newsletter: 'Newsletter (page titles & intro text)',
+  lsa: 'LSA / Veteran Support',
 };
 
 export default function AdminSiteContent() {

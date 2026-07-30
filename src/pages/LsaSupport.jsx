@@ -1,85 +1,85 @@
 import { Link } from 'react-router-dom';
+import { useSiteContent } from '../context/SiteContentContext';
 
-const HELP_ITEMS = [
-  {
-    title: "Veterans' Affairs Applications",
-    body: (
+function HelpItemBody({ item }) {
+  const body = typeof item?.body === 'string' ? item.body.trim() : '';
+  const linkText = typeof item?.linkText === 'string' ? item.linkText.trim() : '';
+  const linkUrl = typeof item?.linkUrl === 'string' ? item.linkUrl.trim() : '';
+
+  if (linkText && linkUrl) {
+    return (
       <>
-        Assistance with completing applications, requesting medical reassessments, and filing claims
-        through{' '}
+        {body ? `${body} ` : null}
         <a
-          href="https://www.veteransaffairs.mil.nz/"
+          href={linkUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="text-rsa-navy font-semibold underline decoration-rsa-gold/60 underline-offset-2 hover:text-rsa-gold"
         >
-          Veterans&apos; Affairs New Zealand
+          {linkText}
         </a>
         .
       </>
-    ),
-  },
-  {
-    title: 'Financial Assistance & Grants',
-    body: 'Support with accessing emergency financial funds or standard welfare grants for medical costs, mobility assistance, or home maintenance.',
-  },
-  {
-    title: 'Health & Well-being Support',
-    body: "Connections to regional healthcare, veterans' counseling services, and localized rehabilitation support.",
-  },
-  {
-    title: 'Home Visits & Welfare Checks',
-    body: 'For veterans or dependents residing in the local Hakaru, Kaiwaka, and Mangawhai areas who are unable to travel to the clubrooms.',
-  },
-];
-
-const ADDRESS = 'Hakaru & Districts Memorial RSA, 733 Settlement Road, Hakaru, NZ';
-const MAPS_URL = `https://maps.google.com/?q=${encodeURIComponent('733 Settlement Road, Hakaru, New Zealand')}`;
+    );
+  }
+  return <>{body}</>;
+}
 
 export default function LsaSupport() {
+  const { lsaPage } = useSiteContent();
+  const page = lsaPage || {};
+
+  const introParagraphs = Array.isArray(page.introParagraphs) ? page.introParagraphs : [];
+  const helpItems = Array.isArray(page.helpItems) ? page.helpItems : [];
+  const enquiryEmails = Array.isArray(page.enquiryEmails) ? page.enquiryEmails : [];
+
+  const address = page.address || '';
+  const mapsQuery = page.addressMapsQuery || address;
+  const mapsUrl = mapsQuery
+    ? `https://maps.google.com/?q=${encodeURIComponent(mapsQuery)}`
+    : '';
+  const mobileTel = (page.mobileTel || page.mobileDisplay || '').replace(/\s/g, '');
+  const websiteHref = page.websiteHref || '/';
+
   return (
     <div className="py-16 md:py-24 bg-gradient-to-b from-rsa-navy via-slate-800 to-rsa-navy min-h-screen">
       <div className="max-w-4xl mx-auto px-4">
         <h1 className="text-3xl md:text-5xl font-bold font-heading text-white mb-4 text-center leading-tight">
-          Veterans&apos; Support &amp; Local Support Advisor (LSA) Services
+          {page.title || "Veterans' Support & Local Support Advisor (LSA) Services"}
         </h1>
-        <p className="text-lg md:text-xl text-gray-300 text-center mb-12 max-w-3xl mx-auto leading-relaxed">
-          The Hakaru &amp; Districts Memorial RSA is dedicated to ensuring that veterans, active
-          service members, and their families receive comprehensive health, pension, and welfare
-          support.
-        </p>
+        {page.subtitle ? (
+          <p className="text-lg md:text-xl text-gray-300 text-center mb-12 max-w-3xl mx-auto leading-relaxed">
+            {page.subtitle}
+          </p>
+        ) : null}
 
         <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl p-8 md:p-12 mb-8">
           <h2 className="text-2xl font-bold font-heading text-rsa-navy mb-4">
-            Veteran Support Services (LSA)
+            {page.servicesTitle || 'Veteran Support Services (LSA)'}
           </h2>
           <div className="space-y-4 text-gray-700 text-lg leading-relaxed">
-            <p>
-              If you are a serving or ex-serving military person, a member of the NZ Police, or a
-              family dependent, our Local Support Advisor (LSA) is here to help you navigate your
-              entitlements. You do not need to be a financial member of the RSA to access our support
-              network.
-            </p>
-            <p>
-              Our LSA offers strictly confidential, one-on-one guidance to connect you with
-              financial, medical, and emotional assistance.
-            </p>
+            {introParagraphs.map((paragraph, idx) => (
+              <p key={idx}>{paragraph}</p>
+            ))}
           </div>
 
           <hr className="border-rsa-navy/15 my-8" />
 
           <h3 className="text-xl font-bold font-heading text-rsa-navy mb-5">
-            How Our Local Support Advisor Can Help
+            {page.helpTitle || 'How Our Local Support Advisor Can Help'}
           </h3>
           <ul className="space-y-5">
-            {HELP_ITEMS.map((item) => (
-              <li key={item.title} className="flex items-start gap-3">
+            {helpItems.map((item, idx) => (
+              <li key={`${item.title || 'help'}-${idx}`} className="flex items-start gap-3">
                 <span
                   className="mt-2 w-2 h-2 rounded-full bg-rsa-gold flex-shrink-0"
                   aria-hidden="true"
                 />
                 <p className="text-gray-700 leading-relaxed">
-                  <span className="font-bold text-rsa-navy">{item.title}:</span> {item.body}
+                  {item.title ? (
+                    <span className="font-bold text-rsa-navy">{item.title}:</span>
+                  ) : null}{' '}
+                  <HelpItemBody item={item} />
                 </p>
               </li>
             ))}
@@ -88,75 +88,101 @@ export default function LsaSupport() {
 
         <div className="bg-rsa-navy border border-white/10 rounded-2xl shadow-2xl p-8 md:p-12">
           <h2 className="text-2xl md:text-3xl font-bold font-heading text-rsa-gold mb-4">
-            Get in Touch
+            {page.contactTitle || 'Get in Touch'}
           </h2>
-          <p className="text-gray-200 leading-relaxed mb-8 max-w-2xl">
-            To book a confidential appointment or a home visit, contact our Local Support Advisor
-            directly or drop into the clubrooms during standard operating hours.
-          </p>
+          {page.contactIntro ? (
+            <p className="text-gray-200 leading-relaxed mb-8 max-w-2xl">{page.contactIntro}</p>
+          ) : null}
 
           <ul className="space-y-5 text-white">
-            <li className="flex flex-col sm:flex-row sm:gap-2 border-b border-white/10 pb-4">
-              <span className="font-bold text-rsa-gold shrink-0 sm:min-w-[11rem]">
-                Local Support Advisor:
-              </span>
-              <span>William Warren</span>
-            </li>
-            <li className="flex flex-col sm:flex-row sm:gap-2 border-b border-white/10 pb-4">
-              <span className="font-bold text-rsa-gold shrink-0 sm:min-w-[11rem]">
-                Physical Address:
-              </span>
-              <a
-                href={MAPS_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-gray-200 hover:text-rsa-gold underline decoration-white/30 underline-offset-2 transition-colors"
-              >
-                {ADDRESS}
-              </a>
-            </li>
-            <li className="flex flex-col sm:flex-row sm:gap-2 border-b border-white/10 pb-4">
-              <span className="font-bold text-rsa-gold shrink-0 sm:min-w-[11rem]">
-                Direct Mobile:
-              </span>
-              <a
-                href="tel:02102545955"
-                className="text-gray-200 hover:text-rsa-gold underline decoration-white/30 underline-offset-2 transition-colors"
-              >
-                021 025 45955
-              </a>
-            </li>
-            <li className="flex flex-col sm:flex-row sm:gap-2 border-b border-white/10 pb-4">
-              <span className="font-bold text-rsa-gold shrink-0 sm:min-w-[11rem]">
-                General Enquiries:
-              </span>
-              <span className="text-gray-200">
+            {page.advisorName ? (
+              <li className="flex flex-col sm:flex-row sm:gap-2 border-b border-white/10 pb-4">
+                <span className="font-bold text-rsa-gold shrink-0 sm:min-w-[11rem]">
+                  {page.advisorLabel || 'Local Support Advisor'}:
+                </span>
+                <span>{page.advisorName}</span>
+              </li>
+            ) : null}
+
+            {address ? (
+              <li className="flex flex-col sm:flex-row sm:gap-2 border-b border-white/10 pb-4">
+                <span className="font-bold text-rsa-gold shrink-0 sm:min-w-[11rem]">
+                  {page.addressLabel || 'Physical Address'}:
+                </span>
+                {mapsUrl ? (
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-200 hover:text-rsa-gold underline decoration-white/30 underline-offset-2 transition-colors"
+                  >
+                    {address}
+                  </a>
+                ) : (
+                  <span className="text-gray-200">{address}</span>
+                )}
+              </li>
+            ) : null}
+
+            {page.mobileDisplay ? (
+              <li className="flex flex-col sm:flex-row sm:gap-2 border-b border-white/10 pb-4">
+                <span className="font-bold text-rsa-gold shrink-0 sm:min-w-[11rem]">
+                  {page.mobileLabel || 'Direct Mobile'}:
+                </span>
                 <a
-                  href="mailto:LSA@hakarursa.co.nz"
-                  className="hover:text-rsa-gold underline decoration-white/30 underline-offset-2 transition-colors"
+                  href={`tel:${mobileTel}`}
+                  className="text-gray-200 hover:text-rsa-gold underline decoration-white/30 underline-offset-2 transition-colors"
                 >
-                  LSA@hakarursa.co.nz
+                  {page.mobileDisplay}
                 </a>
-                {' or '}
-                <a
-                  href="mailto:president@hakarursa.co.nz"
-                  className="hover:text-rsa-gold underline decoration-white/30 underline-offset-2 transition-colors"
-                >
-                  president@hakarursa.co.nz
-                </a>
-              </span>
-            </li>
-            <li className="flex flex-col sm:flex-row sm:gap-2">
-              <span className="font-bold text-rsa-gold shrink-0 sm:min-w-[11rem]">
-                Official Website:
-              </span>
-              <Link
-                to="/"
-                className="text-gray-200 hover:text-rsa-gold underline decoration-white/30 underline-offset-2 transition-colors"
-              >
-                Hakaru RSA Official Portal
-              </Link>
-            </li>
+              </li>
+            ) : null}
+
+            {enquiryEmails.length > 0 ? (
+              <li className="flex flex-col sm:flex-row sm:gap-2 border-b border-white/10 pb-4">
+                <span className="font-bold text-rsa-gold shrink-0 sm:min-w-[11rem]">
+                  {page.enquiriesLabel || 'General Enquiries'}:
+                </span>
+                <span className="text-gray-200">
+                  {enquiryEmails.map((email, idx) => (
+                    <span key={email}>
+                      {idx > 0 ? ' or ' : null}
+                      <a
+                        href={`mailto:${email}`}
+                        className="hover:text-rsa-gold underline decoration-white/30 underline-offset-2 transition-colors"
+                      >
+                        {email}
+                      </a>
+                    </span>
+                  ))}
+                </span>
+              </li>
+            ) : null}
+
+            {page.websiteText ? (
+              <li className="flex flex-col sm:flex-row sm:gap-2">
+                <span className="font-bold text-rsa-gold shrink-0 sm:min-w-[11rem]">
+                  {page.websiteLabel || 'Official Website'}:
+                </span>
+                {websiteHref.startsWith('http') ? (
+                  <a
+                    href={websiteHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-200 hover:text-rsa-gold underline decoration-white/30 underline-offset-2 transition-colors"
+                  >
+                    {page.websiteText}
+                  </a>
+                ) : (
+                  <Link
+                    to={websiteHref}
+                    className="text-gray-200 hover:text-rsa-gold underline decoration-white/30 underline-offset-2 transition-colors"
+                  >
+                    {page.websiteText}
+                  </Link>
+                )}
+              </li>
+            ) : null}
           </ul>
         </div>
       </div>

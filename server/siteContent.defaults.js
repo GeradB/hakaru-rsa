@@ -376,6 +376,60 @@ We would like to acknowledge & deeply appreciate the fantastic work our voluntee
     listTitle: 'Previous newsletters',
     emptyMessage: 'No newsletters published yet. Check back soon.',
   },
+
+  lsaPage: {
+    title: "Veterans' Support & Local Support Advisor (LSA) Services",
+    subtitle:
+      'The Hakaru & Districts Memorial RSA is dedicated to ensuring that veterans, active service members, and their families receive comprehensive health, pension, and welfare support.',
+    servicesTitle: 'Veteran Support Services (LSA)',
+    introParagraphs: [
+      'If you are a serving or ex-serving military person or a family dependent, our Local Support Advisor (LSA) is here to help you navigate your entitlements. You do not need to be a financial member of the RSA to access our support network.',
+      'Our LSA offers strictly confidential, one-on-one guidance to connect you with financial, medical, and emotional assistance.',
+    ],
+    helpTitle: 'How Our Local Support Advisor Can Help',
+    helpItems: [
+      {
+        title: "Veterans' Affairs Applications",
+        body: 'Assistance with completing applications, requesting medical reassessments, and filing claims through',
+        linkText: "Veterans' Affairs New Zealand",
+        linkUrl: 'https://www.veteransaffairs.mil.nz/',
+      },
+      {
+        title: 'Financial Assistance & Grants',
+        body: 'Support with accessing emergency financial funds or standard welfare grants for medical costs, mobility assistance, or home maintenance.',
+        linkText: '',
+        linkUrl: '',
+      },
+      {
+        title: 'Health & Well-being Support',
+        body: "Connections to regional healthcare, veterans' counseling services, and localized rehabilitation support.",
+        linkText: '',
+        linkUrl: '',
+      },
+      {
+        title: 'Home Visits & Welfare Checks',
+        body: 'For veterans or dependents residing in the local Hakaru, Kaiwaka, and Mangawhai areas who are unable to travel to the clubrooms.',
+        linkText: '',
+        linkUrl: '',
+      },
+    ],
+    contactTitle: 'Get in Touch',
+    contactIntro:
+      'To book a confidential appointment or a home visit, contact our Local Support Advisor directly or drop into the clubrooms during standard operating hours.',
+    advisorLabel: 'Local Support Advisor',
+    advisorName: 'William Warren',
+    addressLabel: 'Physical Address',
+    address: 'Hakaru & Districts Memorial RSA, 733 Settlement Road, Hakaru, NZ',
+    addressMapsQuery: '733 Settlement Road, Hakaru, New Zealand',
+    mobileLabel: 'Direct Mobile',
+    mobileDisplay: '021 025 45955',
+    mobileTel: '02102545955',
+    enquiriesLabel: 'General Enquiries',
+    enquiryEmails: ['LSA@hakarursa.co.nz', 'president@hakarursa.co.nz'],
+    websiteLabel: 'Official Website',
+    websiteText: 'Hakaru RSA Official Portal',
+    websiteHref: '/',
+  },
 };
 
 export default siteContent;
