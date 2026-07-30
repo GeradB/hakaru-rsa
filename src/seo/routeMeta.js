@@ -76,6 +76,16 @@ const BY_PATH = {
     description:
       'Support Hakaru RSA with a one-off or recurring donation. Help veterans and local community programmes.',
   },
+  '/veteran-support': {
+    title: `Veteran Support & LSA | ${SITE}`,
+    description:
+      "Confidential Local Support Advisor help with Veterans' Affairs applications, grants, health support, and home visits in Hakaru, Kaiwaka, and Mangawhai.",
+  },
+  '/lsa': {
+    title: `Veteran Support & LSA | ${SITE}`,
+    description:
+      "Confidential Local Support Advisor help with Veterans' Affairs applications, grants, health support, and home visits in Hakaru, Kaiwaka, and Mangawhai.",
+  },
 };
 
 function normalizePathname(pathname) {

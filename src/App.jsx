@@ -26,6 +26,7 @@ import AdminGallery from './pages/AdminGallery';
 import AdminNewsletters from './pages/AdminNewsletters';
 import AdminSiteContent from './pages/AdminSiteContent';
 import Donation from './pages/Donation';
+import LsaSupport from './pages/LsaSupport';
 import { SiteContentProvider } from './context/SiteContentContext';
 import RouteSeo from './components/RouteSeo';
 
@@ -102,6 +103,8 @@ function AppContent() {
         <Route path="/gallery" element={<Gallery />} />
         <Route path="/newsletter" element={<Newsletter />} />
         <Route path="/donate" element={<Donation />} />
+        <Route path="/veteran-support" element={<LsaSupport />} />
+        <Route path="/lsa" element={<LsaSupport />} />
       </Route>
     </Routes>
   );
