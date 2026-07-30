@@ -13,7 +13,7 @@ const siteContent = {
     links: [
       { name: 'Home', href: '/' },
       { name: 'About', href: '/about' },
-      { name: 'Veteran Support', href: '/veteran-support' },
+      { name: 'LSA', href: '/veteran-support' },
       { name: 'Membership', href: '/membership' },
       { name: 'Projects', href: '/projects' },
       { name: 'Gallery', href: '/gallery' },
@@ -199,7 +199,7 @@ We would like to acknowledge & deeply appreciate the fantastic work our voluntee
     quickLinks: [
       { name: 'Home', href: '/' },
       { name: 'About', href: '/about' },
-      { name: 'Veteran Support', href: '/veteran-support' },
+      { name: 'LSA', href: '/veteran-support' },
       { name: 'Membership', href: '/membership' },
       { name: 'Projects', href: '/projects' },
       { name: 'Gallery', href: '/gallery' },
