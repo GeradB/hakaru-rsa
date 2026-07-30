@@ -13,6 +13,32 @@ const SiteContentContext = createContext({
   siteContentReady: false,
 });
 
+/** Shallow-safe deep merge so new default keys (e.g. lsaPage) still appear if API is behind. */
+function deepMerge(target, source) {
+  if (source === null || typeof source !== 'object' || Array.isArray(source)) {
+    return source;
+  }
+  const base =
+    target && typeof target === 'object' && !Array.isArray(target) ? { ...target } : {};
+  for (const key of Object.keys(source)) {
+    const sv = source[key];
+    const tv = base[key];
+    if (
+      sv !== null &&
+      typeof sv === 'object' &&
+      !Array.isArray(sv) &&
+      tv !== null &&
+      typeof tv === 'object' &&
+      !Array.isArray(tv)
+    ) {
+      base[key] = deepMerge(tv, sv);
+    } else {
+      base[key] = sv;
+    }
+  }
+  return base;
+}
+
 export function SiteContentProvider({ children }) {
   const [data, setData] = useState(fallback);
   const [ready, setReady] = useState(false);
@@ -23,7 +49,7 @@ export function SiteContentProvider({ children }) {
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((json) => {
         if (!cancelled && json && typeof json === 'object') {
-          setData(json);
+          setData(deepMerge(fallback, json));
         }
       })
       .catch(() => {})

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { apiUrl } from '../apiBase';
 import { signOutAdmin } from '../lib/adminSignOut';
@@ -17,6 +17,8 @@ const CMS_SLUG_LABELS = {
   lsa: 'LSA / Veteran Support',
 };
 
+const CMS_SLUG_ORDER = Object.keys(CMS_SLUG_LABELS);
+
 export default function AdminSiteContent() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -29,6 +31,14 @@ export default function AdminSiteContent() {
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState(null);
   const [lastUploadUrl, setLastUploadUrl] = useState('');
+
+  const displaySlugs = useMemo(() => {
+    const fromApi = Array.isArray(slugs) ? slugs : [];
+    const set = new Set([...CMS_SLUG_ORDER, ...fromApi]);
+    const ordered = CMS_SLUG_ORDER.filter((s) => set.has(s));
+    const extras = fromApi.filter((s) => !CMS_SLUG_ORDER.includes(s));
+    return [...ordered, ...extras];
+  }, [slugs]);
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('entraIdToken');
@@ -250,9 +260,9 @@ export default function AdminSiteContent() {
               onChange={(e) => setSlug(e.target.value)}
               className="w-full max-w-xl rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-rsa-navy"
             >
-              {slugs.map((s) => (
+              {displaySlugs.map((s) => (
                 <option key={s} value={s}>
-                  {s} — {CMS_SLUG_LABELS[s] || ''}
+                  {s} — {CMS_SLUG_LABELS[s] || s}
                 </option>
               ))}
             </select>
