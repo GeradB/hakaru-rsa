@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { apiUrl } from '../apiBase';
 import { signOutAdmin } from '../lib/adminSignOut';
+import { cloneJson } from '../lib/cmsPath';
+import { hasCmsFormSchema } from '../lib/cmsFormSchema';
+import CmsFragmentForm from '../components/admin/CmsFragmentForm';
 
 const CMS_SLUG_LABELS = {
   global: 'Global (site name, navigation, footer)',
   home: 'Home (hero, welcome, announcements, events teaser, CTA)',
-  about: 'About (nest sponsors under about → sponsors)',
+  about: 'About (including sponsors)',
   membership: 'Membership',
   contact: 'Contact',
   projects: 'Projects',
@@ -25,12 +28,15 @@ export default function AdminSiteContent() {
   const adminLoginHref = `/admin/login?returnUrl=${encodeURIComponent(location.pathname)}`;
   const [slugs, setSlugs] = useState([]);
   const [slug, setSlug] = useState('global');
+  const [fragment, setFragment] = useState({});
   const [jsonText, setJsonText] = useState('{}');
+  const [editorMode, setEditorMode] = useState('form'); // 'form' | 'json'
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState(null);
-  const [lastUploadUrl, setLastUploadUrl] = useState('');
+
+  const formAvailable = hasCmsFormSchema(slug);
 
   const displaySlugs = useMemo(() => {
     const fromApi = Array.isArray(slugs) ? slugs : [];
@@ -44,6 +50,12 @@ export default function AdminSiteContent() {
     const token = localStorage.getItem('entraIdToken');
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
+
+  const applyFragment = useCallback((next) => {
+    const cloned = cloneJson(next && typeof next === 'object' ? next : {}) || {};
+    setFragment(cloned);
+    setJsonText(JSON.stringify(cloned, null, 2));
+  }, []);
 
   const loadSlug = useCallback(
     async (s) => {
@@ -62,9 +74,9 @@ export default function AdminSiteContent() {
         throw new Error(data.error || 'Failed to load');
       }
       const data = await res.json();
-      setJsonText(JSON.stringify(data.fragment || {}, null, 2));
+      applyFragment(data.fragment || {});
     },
-    [navigate, adminLoginHref],
+    [navigate, adminLoginHref, applyFragment],
   );
 
   useEffect(() => {
@@ -101,6 +113,9 @@ export default function AdminSiteContent() {
       try {
         setMessage(null);
         await loadSlug(slug);
+        if (!cancelled) {
+          setEditorMode(hasCmsFormSchema(slug) ? 'form' : 'json');
+        }
       } catch (e) {
         if (!cancelled) setMessage({ type: 'error', text: e.message });
       }
@@ -116,12 +131,50 @@ export default function AdminSiteContent() {
     });
   };
 
+  const syncJsonFromForm = () => {
+    setJsonText(JSON.stringify(fragment, null, 2));
+  };
+
+  const syncFormFromJson = () => {
+    const parsed = JSON.parse(jsonText);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('JSON must be an object');
+    }
+    setFragment(cloneJson(parsed));
+  };
+
+  const switchMode = (mode) => {
+    try {
+      if (mode === 'json' && editorMode === 'form') {
+        syncJsonFromForm();
+      }
+      if (mode === 'form' && editorMode === 'json') {
+        syncFormFromJson();
+      }
+      setEditorMode(mode);
+      setMessage(null);
+    } catch {
+      setMessage({
+        type: 'error',
+        text: 'Fix invalid JSON before switching to the form editor.',
+      });
+    }
+  };
+
   const save = async () => {
     let payload;
     try {
-      payload = JSON.parse(jsonText);
+      if (editorMode === 'json') {
+        payload = JSON.parse(jsonText);
+      } else {
+        payload = fragment;
+      }
     } catch {
       setMessage({ type: 'error', text: 'Invalid JSON — fix syntax before saving.' });
+      return;
+    }
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      setMessage({ type: 'error', text: 'Content must be a JSON object.' });
       return;
     }
     setSaving(true);
@@ -138,7 +191,7 @@ export default function AdminSiteContent() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Save failed');
-      setJsonText(JSON.stringify(data.fragment || payload, null, 2));
+      applyFragment(data.fragment || payload);
       setMessage({ type: 'ok', text: 'Saved. Public pages will show changes after refresh.' });
     } catch (e) {
       setMessage({ type: 'error', text: e.message });
@@ -149,17 +202,15 @@ export default function AdminSiteContent() {
 
   const formatJson = () => {
     try {
-      setJsonText(JSON.stringify(JSON.parse(jsonText), null, 2));
+      const parsed = JSON.parse(jsonText);
+      setJsonText(JSON.stringify(parsed, null, 2));
       setMessage({ type: 'ok', text: 'JSON formatted.' });
     } catch {
       setMessage({ type: 'error', text: 'Cannot format — invalid JSON.' });
     }
   };
 
-  const onUpload = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
+  const onUploadFile = async (file, setUrl) => {
     setUploading(true);
     setMessage(null);
     try {
@@ -173,11 +224,10 @@ export default function AdminSiteContent() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Upload failed');
-      setLastUploadUrl(data.publicUrl || '');
-      setMessage({
-        type: 'ok',
-        text: 'Image uploaded. Copy the URL below into any imageUrl field in the JSON.',
-      });
+      const url = data.publicUrl || '';
+      if (!url) throw new Error('Upload succeeded but no URL was returned');
+      setUrl(url);
+      setMessage({ type: 'ok', text: 'Image uploaded and applied to the field.' });
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
     } finally {
@@ -202,7 +252,7 @@ export default function AdminSiteContent() {
               Site content
             </h1>
             <p className="text-xs text-gray-400 md:text-sm">
-              Edit JSON per section. Use image URL fields for photos (upload first, then paste).
+              Edit page copy with forms. Upload images directly onto image fields.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -249,7 +299,7 @@ export default function AdminSiteContent() {
           </div>
         )}
 
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end">
+        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="flex-1">
             <label htmlFor="cms-slug" className="mb-1 block text-xs font-semibold text-rsa-gold">
               Section
@@ -262,41 +312,67 @@ export default function AdminSiteContent() {
             >
               {displaySlugs.map((s) => (
                 <option key={s} value={s}>
-                  {s} — {CMS_SLUG_LABELS[s] || s}
+                  {CMS_SLUG_LABELS[s] || s}
                 </option>
               ))}
             </select>
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-rsa-gold">
-              Upload image (JPEG/PNG/WebP)
-            </label>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              disabled={uploading}
-              onChange={onUpload}
-              className="block w-full text-sm text-gray-200 file:mr-3 file:rounded-md file:border-0 file:bg-rsa-gold file:px-3 file:py-2 file:text-sm file:font-bold file:text-rsa-navy"
-            />
+
+          <div
+            className="inline-flex rounded-lg border border-white/20 bg-black/20 p-1"
+            role="group"
+            aria-label="Editor mode"
+          >
+            <button
+              type="button"
+              disabled={!formAvailable}
+              onClick={() => switchMode('form')}
+              className={`rounded-md px-3 py-2 text-sm font-medium ${
+                editorMode === 'form'
+                  ? 'bg-rsa-gold text-rsa-navy'
+                  : 'text-gray-200 hover:bg-white/10 disabled:opacity-40'
+              }`}
+            >
+              Form editor
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMode('json')}
+              className={`rounded-md px-3 py-2 text-sm font-medium ${
+                editorMode === 'json'
+                  ? 'bg-rsa-gold text-rsa-navy'
+                  : 'text-gray-200 hover:bg-white/10'
+              }`}
+            >
+              Advanced JSON
+            </button>
           </div>
         </div>
 
-        {lastUploadUrl && (
-          <div className="mb-4 rounded-lg border border-rsa-gold/40 bg-black/20 p-3">
-            <p className="text-xs text-gray-400 mb-1">Last uploaded URL (copy into JSON):</p>
-            <code className="break-all text-sm text-rsa-gold">{lastUploadUrl}</code>
-          </div>
+        {editorMode === 'form' ? (
+          <CmsFragmentForm
+            slug={slug}
+            value={fragment}
+            onChange={setFragment}
+            uploading={uploading}
+            onUploadFile={onUploadFile}
+          />
+        ) : (
+          <>
+            <p className="mb-3 text-sm text-gray-400">
+              Prefer the form editor when possible. JSON is for uncommon fields or troubleshooting.
+            </p>
+            <textarea
+              value={jsonText}
+              onChange={(e) => setJsonText(e.target.value)}
+              spellCheck={false}
+              className="mb-4 min-h-[420px] w-full rounded-xl border border-white/15 bg-white/[0.97] p-4 font-mono text-sm text-gray-900 shadow-xl"
+              aria-label="JSON content for selected section"
+            />
+          </>
         )}
 
-        <textarea
-          value={jsonText}
-          onChange={(e) => setJsonText(e.target.value)}
-          spellCheck={false}
-          className="mb-4 min-h-[420px] w-full rounded-xl border border-white/15 bg-white/[0.97] p-4 font-mono text-sm text-gray-900 shadow-xl"
-          aria-label="JSON content for selected section"
-        />
-
-        <div className="flex flex-wrap gap-3">
+        <div className="mt-6 flex flex-wrap gap-3">
           <button
             type="button"
             onClick={save}
@@ -305,23 +381,21 @@ export default function AdminSiteContent() {
           >
             {saving ? 'Saving…' : 'Save section'}
           </button>
-          <button
-            type="button"
-            onClick={formatJson}
-            className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/20"
-          >
-            Format JSON
-          </button>
+          {editorMode === 'json' ? (
+            <button
+              type="button"
+              onClick={formatJson}
+              className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/20"
+            >
+              Format JSON
+            </button>
+          ) : null}
         </div>
 
-        <p className="mt-8 text-sm text-gray-400 max-w-3xl leading-relaxed">
-          Run <code className="text-rsa-gold">server/migrations/002_cms_content.sql</code> on your
-          database if this is the first time. Image URLs must be HTTPS and publicly readable (same
-          Azure container as the gallery). For rich layouts, use optional fields like{' '}
-          <code className="text-white">hero.imageUrl</code>,{' '}
-          <code className="text-white">welcome.imageUrl</code>,{' '}
-          <code className="text-white">about.introImageUrl</code>,{' '}
-          <code className="text-white">committeePage.members[].imageUrl</code>.
+        <p className="mt-8 max-w-3xl text-sm leading-relaxed text-gray-400">
+          Pick a section, edit the labelled fields, upload images onto image fields, then save.
+          Changes appear on the public site after a refresh. Weekly events live under{' '}
+          <strong className="font-medium text-gray-300">Home → What’s On</strong>.
         </p>
       </div>
     </div>
