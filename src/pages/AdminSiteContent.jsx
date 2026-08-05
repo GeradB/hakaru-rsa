@@ -1,40 +1,72 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { apiUrl } from '../apiBase';
 import { signOutAdmin } from '../lib/adminSignOut';
 import { cloneJson } from '../lib/cmsPath';
-import { hasCmsFormSchema } from '../lib/cmsFormSchema';
+import {
+  CMS_FRAGMENT_KEYS,
+  CMS_SLUG_PREVIEW,
+  hasCmsFormSchema,
+} from '../lib/cmsFormSchema';
 import CmsFragmentForm from '../components/admin/CmsFragmentForm';
+import CmsLivePreview from '../components/admin/CmsLivePreview';
+import fallbackSiteContent from '../../shared/siteContent.defaults.js';
 
-const CMS_SLUG_LABELS = {
-  global: 'Global (site name, navigation, footer)',
-  home: 'Home (hero, welcome, announcements, events teaser, CTA)',
-  about: 'About (including sponsors)',
-  membership: 'Membership',
-  contact: 'Contact',
-  projects: 'Projects',
-  events: 'Events page (headings — weekly list uses Home → What’s On)',
-  committee: 'Committee',
-  donate: 'Donate (titles & intro text)',
-  newsletter: 'Newsletter (page titles & intro text)',
-  lsa: 'LSA / Veteran Support',
-};
+const CMS_SLUG_ORDER = Object.keys(CMS_SLUG_PREVIEW);
 
-const CMS_SLUG_ORDER = Object.keys(CMS_SLUG_LABELS);
+function deepMerge(target, source) {
+  if (source === null || typeof source !== 'object' || Array.isArray(source)) {
+    return source;
+  }
+  const base =
+    target && typeof target === 'object' && !Array.isArray(target) ? { ...target } : {};
+  for (const key of Object.keys(source)) {
+    const sv = source[key];
+    const tv = base[key];
+    if (
+      sv !== null &&
+      typeof sv === 'object' &&
+      !Array.isArray(sv) &&
+      tv !== null &&
+      typeof tv === 'object' &&
+      !Array.isArray(tv)
+    ) {
+      base[key] = deepMerge(tv, sv);
+    } else {
+      base[key] = sv;
+    }
+  }
+  return base;
+}
+
+function applyFragmentToBase(base, slug, fragment) {
+  const keys = CMS_FRAGMENT_KEYS[slug] || [];
+  const next = cloneJson(base) || {};
+  for (const key of keys) {
+    if (fragment && fragment[key] !== undefined) {
+      next[key] = cloneJson(fragment[key]);
+    }
+  }
+  return next;
+}
 
 export default function AdminSiteContent() {
   const navigate = useNavigate();
   const location = useLocation();
   const adminLoginHref = `/admin/login?returnUrl=${encodeURIComponent(location.pathname)}`;
   const [slugs, setSlugs] = useState([]);
-  const [slug, setSlug] = useState('global');
+  const [slug, setSlug] = useState('home');
+  const [baseContent, setBaseContent] = useState(fallbackSiteContent);
   const [fragment, setFragment] = useState({});
   const [jsonText, setJsonText] = useState('{}');
-  const [editorMode, setEditorMode] = useState('form'); // 'form' | 'json'
+  const [editorMode, setEditorMode] = useState('form');
+  const [mobilePane, setMobilePane] = useState('edit'); // 'edit' | 'preview'
+  const [viewport, setViewport] = useState('desktop');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState(null);
+  const [dirty, setDirty] = useState(false);
 
   const formAvailable = hasCmsFormSchema(slug);
 
@@ -51,10 +83,33 @@ export default function AdminSiteContent() {
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
+  const draftFragment = useMemo(() => {
+    if (editorMode !== 'json') return fragment;
+    try {
+      const parsed = JSON.parse(jsonText);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    } catch {
+      /* keep last good fragment for preview */
+    }
+    return fragment;
+  }, [editorMode, fragment, jsonText]);
+
+  const previewContent = useMemo(
+    () => applyFragmentToBase(baseContent, slug, draftFragment),
+    [baseContent, slug, draftFragment],
+  );
+  const deferredPreview = useDeferredValue(previewContent);
+
   const applyFragment = useCallback((next) => {
     const cloned = cloneJson(next && typeof next === 'object' ? next : {}) || {};
     setFragment(cloned);
     setJsonText(JSON.stringify(cloned, null, 2));
+    setDirty(false);
+  }, []);
+
+  const updateFragment = useCallback((next) => {
+    setFragment(next);
+    setDirty(true);
   }, []);
 
   const loadSlug = useCallback(
@@ -83,18 +138,27 @@ export default function AdminSiteContent() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(apiUrl('/api/admin/site-content/slugs'), {
-          credentials: 'include',
-          headers: getAuthHeaders(),
-        });
-        if (res.status === 401) {
+        const [slugsRes, contentRes] = await Promise.all([
+          fetch(apiUrl('/api/admin/site-content/slugs'), {
+            credentials: 'include',
+            headers: getAuthHeaders(),
+          }),
+          fetch(apiUrl('/api/site-content')),
+        ]);
+        if (slugsRes.status === 401) {
           localStorage.removeItem('adminAuth');
           localStorage.removeItem('entraIdToken');
           navigate(adminLoginHref, { replace: true });
           return;
         }
-        const data = await res.json();
-        if (!cancelled) setSlugs(data.slugs || []);
+        const slugsData = await slugsRes.json();
+        if (!cancelled) setSlugs(slugsData.slugs || []);
+        if (contentRes.ok) {
+          const full = await contentRes.json();
+          if (!cancelled && full && typeof full === 'object') {
+            setBaseContent(deepMerge(fallbackSiteContent, full));
+          }
+        }
       } catch (e) {
         if (!cancelled) setMessage({ type: 'error', text: e.message });
       } finally {
@@ -115,6 +179,7 @@ export default function AdminSiteContent() {
         await loadSlug(slug);
         if (!cancelled) {
           setEditorMode(hasCmsFormSchema(slug) ? 'form' : 'json');
+          setMobilePane('edit');
         }
       } catch (e) {
         if (!cancelled) setMessage({ type: 'error', text: e.message });
@@ -131,25 +196,17 @@ export default function AdminSiteContent() {
     });
   };
 
-  const syncJsonFromForm = () => {
-    setJsonText(JSON.stringify(fragment, null, 2));
-  };
-
-  const syncFormFromJson = () => {
-    const parsed = JSON.parse(jsonText);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error('JSON must be an object');
-    }
-    setFragment(cloneJson(parsed));
-  };
-
   const switchMode = (mode) => {
     try {
       if (mode === 'json' && editorMode === 'form') {
-        syncJsonFromForm();
+        setJsonText(JSON.stringify(fragment, null, 2));
       }
       if (mode === 'form' && editorMode === 'json') {
-        syncFormFromJson();
+        const parsed = JSON.parse(jsonText);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('JSON must be an object');
+        }
+        setFragment(cloneJson(parsed));
       }
       setEditorMode(mode);
       setMessage(null);
@@ -192,7 +249,11 @@ export default function AdminSiteContent() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Save failed');
       applyFragment(data.fragment || payload);
-      setMessage({ type: 'ok', text: 'Saved. Public pages will show changes after refresh.' });
+      setBaseContent((prev) => applyFragmentToBase(prev, slug, data.fragment || payload));
+      setMessage({
+        type: 'ok',
+        text: 'Saved and published. Live preview matches the public site after visitors refresh.',
+      });
     } catch (e) {
       setMessage({ type: 'error', text: e.message });
     } finally {
@@ -227,7 +288,8 @@ export default function AdminSiteContent() {
       const url = data.publicUrl || '';
       if (!url) throw new Error('Upload succeeded but no URL was returned');
       setUrl(url);
-      setMessage({ type: 'ok', text: 'Image uploaded and applied to the field.' });
+      setDirty(true);
+      setMessage({ type: 'ok', text: 'Image uploaded — check the live preview.' });
     } catch (err) {
       setMessage({ type: 'error', text: err.message });
     } finally {
@@ -243,16 +305,21 @@ export default function AdminSiteContent() {
     );
   }
 
+  const previewMeta = CMS_SLUG_PREVIEW[slug];
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-rsa-navy via-slate-900 to-rsa-navy pb-16">
       <header className="sticky top-0 z-40 border-b border-white/10 bg-rsa-navy/90 backdrop-blur-md shadow-lg">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4">
+        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-4 px-4 py-4">
           <div>
             <h1 className="font-heading text-xl font-bold text-white md:text-2xl">
               Site content
             </h1>
             <p className="text-xs text-gray-400 md:text-sm">
-              Edit page copy with forms. Upload images directly onto image fields.
+              Edit labelled fields and watch the live page preview update as you type.
+              {dirty ? (
+                <span className="ml-2 text-amber-300">Unsaved changes</span>
+              ) : null}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -269,10 +336,12 @@ export default function AdminSiteContent() {
               Newsletters
             </Link>
             <Link
-              to="/"
+              to={previewMeta?.path || '/'}
+              target="_blank"
+              rel="noreferrer"
               className="rounded-lg border border-white/25 bg-white/5 px-3 py-2 text-sm text-white hover:bg-white/15"
             >
-              Site home
+              Open live page
             </Link>
             <button
               type="button"
@@ -285,10 +354,10 @@ export default function AdminSiteContent() {
         </div>
       </header>
 
-      <div className="relative z-10 mx-auto max-w-6xl px-4 pt-8">
+      <div className="relative z-10 mx-auto max-w-[1600px] px-4 pt-6">
         {message && (
           <div
-            className={`mb-6 rounded-xl border px-4 py-3 ${
+            className={`mb-4 rounded-xl border px-4 py-3 ${
               message.type === 'error'
                 ? 'border-red-300/50 bg-red-950/40 text-red-100'
                 : 'border-emerald-400/40 bg-emerald-950/35 text-emerald-50'
@@ -299,103 +368,196 @@ export default function AdminSiteContent() {
           </div>
         )}
 
-        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="flex-1">
-            <label htmlFor="cms-slug" className="mb-1 block text-xs font-semibold text-rsa-gold">
-              Section
-            </label>
-            <select
-              id="cms-slug"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              className="w-full max-w-xl rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-rsa-navy"
+        {/* Page picker — reflective of site sections */}
+        <div className="mb-5">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-rsa-gold">
+            Choose a page to edit
+          </p>
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {displaySlugs.map((s) => {
+              const meta = CMS_SLUG_PREVIEW[s] || { title: s, subtitle: s };
+              const active = s === slug;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => {
+                    if (dirty && !window.confirm('Discard unsaved changes for this section?')) {
+                      return;
+                    }
+                    setSlug(s);
+                  }}
+                  className={`min-w-[9.5rem] shrink-0 rounded-xl border px-3 py-3 text-left transition ${
+                    active
+                      ? 'border-rsa-gold bg-rsa-gold/15 text-white shadow-lg'
+                      : 'border-white/15 bg-white/5 text-gray-200 hover:bg-white/10'
+                  }`}
+                >
+                  <span className="block text-sm font-semibold">{meta.title}</span>
+                  <span className="mt-0.5 block text-[11px] leading-snug text-gray-400">
+                    {meta.subtitle}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div
+            className="inline-flex rounded-lg border border-white/20 bg-black/20 p-1 lg:hidden"
+            role="group"
+            aria-label="Edit or preview"
+          >
+            <button
+              type="button"
+              onClick={() => setMobilePane('edit')}
+              className={`rounded-md px-3 py-2 text-sm font-medium ${
+                mobilePane === 'edit' ? 'bg-rsa-gold text-rsa-navy' : 'text-gray-200'
+              }`}
             >
-              {displaySlugs.map((s) => (
-                <option key={s} value={s}>
-                  {CMS_SLUG_LABELS[s] || s}
-                </option>
-              ))}
-            </select>
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobilePane('preview')}
+              className={`rounded-md px-3 py-2 text-sm font-medium ${
+                mobilePane === 'preview' ? 'bg-rsa-gold text-rsa-navy' : 'text-gray-200'
+              }`}
+            >
+              Preview
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div
+              className="inline-flex rounded-lg border border-white/20 bg-black/20 p-1"
+              role="group"
+              aria-label="Preview size"
+            >
+              <button
+                type="button"
+                onClick={() => setViewport('desktop')}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+                  viewport === 'desktop' ? 'bg-white/20 text-white' : 'text-gray-300'
+                }`}
+              >
+                Desktop
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewport('mobile')}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+                  viewport === 'mobile' ? 'bg-white/20 text-white' : 'text-gray-300'
+                }`}
+              >
+                Mobile
+              </button>
+            </div>
+
+            <div
+              className="inline-flex rounded-lg border border-white/20 bg-black/20 p-1"
+              role="group"
+              aria-label="Editor mode"
+            >
+              <button
+                type="button"
+                disabled={!formAvailable}
+                onClick={() => switchMode('form')}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+                  editorMode === 'form'
+                    ? 'bg-rsa-gold text-rsa-navy'
+                    : 'text-gray-200 disabled:opacity-40'
+                }`}
+              >
+                Easy edit
+              </button>
+              <button
+                type="button"
+                onClick={() => switchMode('json')}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium ${
+                  editorMode === 'json' ? 'bg-rsa-gold text-rsa-navy' : 'text-gray-200'
+                }`}
+              >
+                Advanced JSON
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-2 xl:items-start">
+          <div className={mobilePane === 'preview' ? 'hidden xl:block' : ''}>
+            {editorMode === 'form' ? (
+              <CmsFragmentForm
+                slug={slug}
+                value={fragment}
+                onChange={updateFragment}
+                uploading={uploading}
+                onUploadFile={onUploadFile}
+              />
+            ) : (
+              <>
+                <p className="mb-3 text-sm text-gray-400">
+                  Prefer Easy edit when possible. JSON is for troubleshooting only.
+                </p>
+                <textarea
+                  value={jsonText}
+                  onChange={(e) => {
+                    setJsonText(e.target.value);
+                    setDirty(true);
+                  }}
+                  spellCheck={false}
+                  className="min-h-[420px] w-full rounded-xl border border-white/15 bg-white/[0.97] p-4 font-mono text-sm text-gray-900 shadow-xl"
+                  aria-label="JSON content for selected section"
+                />
+              </>
+            )}
+
+            <div className="sticky bottom-4 mt-6 flex flex-wrap gap-3 rounded-xl border border-white/10 bg-rsa-navy/95 p-3 shadow-2xl backdrop-blur">
+              <button
+                type="button"
+                onClick={save}
+                disabled={saving}
+                className="rounded-lg bg-rsa-gold px-6 py-2.5 text-sm font-bold text-rsa-navy hover:bg-yellow-400 disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Save & publish'}
+              </button>
+              {editorMode === 'json' ? (
+                <button
+                  type="button"
+                  onClick={formatJson}
+                  className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/20"
+                >
+                  Format JSON
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/20 xl:hidden"
+                onClick={() => setMobilePane('preview')}
+              >
+                Show preview
+              </button>
+            </div>
           </div>
 
           <div
-            className="inline-flex rounded-lg border border-white/20 bg-black/20 p-1"
-            role="group"
-            aria-label="Editor mode"
+            className={`xl:sticky xl:top-24 xl:self-start ${
+              mobilePane === 'edit' ? 'hidden xl:block' : ''
+            }`}
           >
-            <button
-              type="button"
-              disabled={!formAvailable}
-              onClick={() => switchMode('form')}
-              className={`rounded-md px-3 py-2 text-sm font-medium ${
-                editorMode === 'form'
-                  ? 'bg-rsa-gold text-rsa-navy'
-                  : 'text-gray-200 hover:bg-white/10 disabled:opacity-40'
-              }`}
-            >
-              Form editor
-            </button>
-            <button
-              type="button"
-              onClick={() => switchMode('json')}
-              className={`rounded-md px-3 py-2 text-sm font-medium ${
-                editorMode === 'json'
-                  ? 'bg-rsa-gold text-rsa-navy'
-                  : 'text-gray-200 hover:bg-white/10'
-              }`}
-            >
-              Advanced JSON
-            </button>
+            <CmsLivePreview
+              slug={slug}
+              content={deferredPreview}
+              viewport={viewport}
+            />
           </div>
         </div>
 
-        {editorMode === 'form' ? (
-          <CmsFragmentForm
-            slug={slug}
-            value={fragment}
-            onChange={setFragment}
-            uploading={uploading}
-            onUploadFile={onUploadFile}
-          />
-        ) : (
-          <>
-            <p className="mb-3 text-sm text-gray-400">
-              Prefer the form editor when possible. JSON is for uncommon fields or troubleshooting.
-            </p>
-            <textarea
-              value={jsonText}
-              onChange={(e) => setJsonText(e.target.value)}
-              spellCheck={false}
-              className="mb-4 min-h-[420px] w-full rounded-xl border border-white/15 bg-white/[0.97] p-4 font-mono text-sm text-gray-900 shadow-xl"
-              aria-label="JSON content for selected section"
-            />
-          </>
-        )}
-
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving}
-            className="rounded-lg bg-rsa-gold px-6 py-2.5 text-sm font-bold text-rsa-navy hover:bg-yellow-400 disabled:opacity-50"
-          >
-            {saving ? 'Saving…' : 'Save section'}
-          </button>
-          {editorMode === 'json' ? (
-            <button
-              type="button"
-              onClick={formatJson}
-              className="rounded-lg border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/20"
-            >
-              Format JSON
-            </button>
-          ) : null}
-        </div>
-
         <p className="mt-8 max-w-3xl text-sm leading-relaxed text-gray-400">
-          Pick a section, edit the labelled fields, upload images onto image fields, then save.
-          Changes appear on the public site after a refresh. Weekly events live under{' '}
-          <strong className="font-medium text-gray-300">Home → What’s On</strong>.
+          The preview uses the real website layout. Edit on the left, confirm on the right, then
+          Save &amp; publish. Weekly event cards are under{' '}
+          <strong className="font-medium text-gray-300">Home</strong>.
         </p>
       </div>
     </div>

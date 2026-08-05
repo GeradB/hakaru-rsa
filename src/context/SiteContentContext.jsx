@@ -86,3 +86,22 @@ export function useSiteContentReady() {
   const { siteContentReady } = useContext(SiteContentContext);
   return siteContentReady;
 }
+
+/**
+ * Override site content for admin live preview (draft edits before save).
+ * Nest inside the normal provider; preview trees read this instead.
+ */
+export function SiteContentOverride({ content, children }) {
+  const value = useMemo(
+    () => ({
+      siteContent: content || fallback,
+      siteContentReady: true,
+    }),
+    [content],
+  );
+  return (
+    <SiteContentContext.Provider value={value}>
+      {children}
+    </SiteContentContext.Provider>
+  );
+}

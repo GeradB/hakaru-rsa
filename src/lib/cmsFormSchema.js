@@ -3,6 +3,49 @@
  * Paths are relative to the slug fragment returned by the API.
  */
 
+/** Top-level siteContent keys editable per admin slug (mirrors server cmsMerge). */
+export const CMS_FRAGMENT_KEYS = {
+  global: ['site', 'navigation', 'footer'],
+  home: ['hero', 'welcome', 'announcements', 'upcomingEvents', 'homeCta'],
+  about: ['about'],
+  membership: ['membership'],
+  contact: ['contact'],
+  projects: ['projectsPage'],
+  events: ['eventsPage'],
+  committee: ['committeePage'],
+  donate: ['donatePage'],
+  newsletter: ['newsletterPage'],
+  lsa: ['lsaPage'],
+};
+
+/** Public page each slug previews in the WYSIWYG panel. */
+export const CMS_SLUG_PREVIEW = {
+  global: {
+    title: 'Site-wide',
+    subtitle: 'Name, menu & footer',
+    path: '/',
+    previewNote: 'Preview shows the home page with your draft nav and footer.',
+  },
+  home: {
+    title: 'Home',
+    subtitle: 'Hero, welcome, announcements & What’s On',
+    path: '/',
+  },
+  about: { title: 'About', subtitle: 'History, mission & sponsors', path: '/about' },
+  membership: { title: 'Membership', subtitle: 'Types & how to join', path: '/membership' },
+  contact: { title: 'Contact', subtitle: 'Address, phone & hours', path: '/contact' },
+  projects: { title: 'Projects', subtitle: 'Community projects', path: '/projects' },
+  events: {
+    title: 'Events',
+    subtitle: 'Page headings (weekly list is under Home)',
+    path: '/events',
+  },
+  committee: { title: 'Committee', subtitle: 'Executive members', path: '/committee' },
+  donate: { title: 'Donate', subtitle: 'Titles & intro', path: '/donate' },
+  newsletter: { title: 'Newsletter', subtitle: 'Page copy', path: '/newsletter' },
+  lsa: { title: 'LSA / Veteran Support', subtitle: 'Support page', path: '/veteran-support' },
+};
+
 const linkItem = [
   { key: 'name', label: 'Label', type: 'text' },
   { key: 'href', label: 'URL / path', type: 'text' },
