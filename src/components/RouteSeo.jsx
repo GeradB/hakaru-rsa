@@ -16,7 +16,10 @@ export default function RouteSeo() {
   const { title, description, noindex } = getSeoForPath(pathname);
   const canonical = absoluteUrl(path === '/' ? '/' : path);
   const origin = getPublicSiteOrigin();
-  const ogImage = import.meta.env.VITE_PUBLIC_OG_IMAGE_URL?.trim();
+  const ogImage =
+    import.meta.env.VITE_PUBLIC_OG_IMAGE_URL?.trim() || absoluteUrl('/og-image.jpg');
+  const ogImageAlt =
+    'Hakaru & Districts RSA — Honouring Service, Supporting Veterans, Building Community';
 
   const organizationJsonLd = useMemo(
     () =>
@@ -28,10 +31,12 @@ export default function RouteSeo() {
             name: 'Hakaru RSA',
             alternateName: 'Hakaru & Districts Returned and Services Association',
             url: origin,
+            logo: ogImage,
+            image: ogImage,
             description:
               'Supporting veterans, active service members, and families in the Hakaru district and North Waikato.',
           },
-    [noindex, origin],
+    [noindex, origin, ogImage],
   );
 
   return (
@@ -53,11 +58,16 @@ export default function RouteSeo() {
       <meta property="og:title" content={title} />
       <meta property="og:description" content={description} />
       <meta property="og:url" content={canonical} />
-      {ogImage ? <meta property="og:image" content={ogImage} /> : null}
-      <meta name="twitter:card" content={ogImage ? 'summary_large_image' : 'summary'} />
+      <meta property="og:image" content={ogImage} />
+      <meta property="og:image:width" content="1200" />
+      <meta property="og:image:height" content="630" />
+      <meta property="og:image:alt" content={ogImageAlt} />
+      <meta property="og:image:type" content="image/jpeg" />
+      <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={title} />
       <meta name="twitter:description" content={description} />
-      {ogImage ? <meta name="twitter:image" content={ogImage} /> : null}
+      <meta name="twitter:image" content={ogImage} />
+      <meta name="twitter:image:alt" content={ogImageAlt} />
       {organizationJsonLd ? (
         <script type="application/ld+json">
           {JSON.stringify(organizationJsonLd)}

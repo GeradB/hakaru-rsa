@@ -70,8 +70,26 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400 text-sm">
-          {(footer.copyright || '').replace(/^\?\s*/, '\u00A9 ')}
+        <div className="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400 text-sm space-y-3">
+          <p>{(footer.copyright || '').replace(/^\?\s*/, '\u00A9 ')}</p>
+          <p>
+            <a
+              href="https://edgeandembers.co.nz/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-[0.35em] text-gray-400 hover:text-rsa-gold transition-colors"
+            >
+              <svg
+                className="h-[1em] w-[1em] shrink-0"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M12 2c.6 1.4 2.6 4 4.2 6.2C18.1 10.6 20 13.2 20 16.2 20 20.4 16.4 23 12 23s-8-2.6-8-6.8c0-3 1.9-5.6 3.8-8C9.4 6 11.4 3.4 12 2z" />
+              </svg>
+              <span>Built by Edge and Embers</span>
+            </a>
+          </p>
         </div>
       </div>
     </footer>
