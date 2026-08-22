@@ -46,7 +46,7 @@ export default function Projects() {
             </h2>
             <p className="text-gray-700 leading-relaxed max-w-3xl mx-auto">
               {pp.missionBody ||
-                'The Hakaru & Districts RSA is dedicated to serving our veterans and community.'}
+                'The Hakaru & Districts Memorial RSA is dedicated to serving our veterans and community.'}
             </p>
           </div>
         </div>

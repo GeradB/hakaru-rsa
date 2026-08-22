@@ -1,4 +1,4 @@
-const SITE = 'Hakaru RSA';
+const SITE = 'Hakaru & Districts Memorial RSA';
 
 const DEFAULT_DESCRIPTION =
   'Hakaru & Districts Returned and Services Association — supporting veterans, service members, and families in North Waikato. Membership, events, and community.';
@@ -14,67 +14,67 @@ const BY_PATH = {
   '/about': {
     title: `About | ${SITE}`,
     description:
-      'Learn about Hakaru RSA, our history, and how we support veterans and the wider community in the Hakaru district.',
+      'Learn about Hakaru & Districts Memorial RSA, our history, and how we support veterans and the wider community in the Hakaru district.',
   },
   '/membership': {
     title: `Membership | ${SITE}`,
     description:
-      'RSA membership types, fees, and benefits at Hakaru & Districts RSA. Join our community and support local veterans.',
+      'RSA membership types, fees, and benefits at Hakaru & Districts Memorial RSA. Join our community and support local veterans.',
   },
   '/membership/become': {
     title: `Become a Member | ${SITE}`,
     description:
-      'Apply for Hakaru RSA membership online. Complete your details and secure payment in a few steps.',
+      'Apply for Hakaru & Districts Memorial RSA membership online. Complete your details and secure payment in a few steps.',
   },
   '/membership/renew': {
     title: `Renew Membership | ${SITE}`,
     description:
-      'Renew your Hakaru RSA membership for the current year. Quick online renewal and payment.',
+      'Renew your Hakaru & Districts Memorial RSA membership for the current year. Quick online renewal and payment.',
   },
   '/membership/success': {
     title: `Membership Submitted | ${SITE}`,
     description:
-      'Thank you — your Hakaru RSA membership application or renewal has been received.',
+      'Thank you — your Hakaru & Districts Memorial RSA membership application or renewal has been received.',
   },
   '/renew': {
     title: `Become a Member | ${SITE}`,
     description:
-      'Apply for Hakaru RSA membership online. Complete your details and secure payment in a few steps.',
+      'Apply for Hakaru & Districts Memorial RSA membership online. Complete your details and secure payment in a few steps.',
   },
   '/events': {
     title: `What's On | ${SITE}`,
     description:
-      'Upcoming events, regular club nights, and community gatherings at Hakaru RSA.',
+      'Upcoming events, regular club nights, and community gatherings at Hakaru & Districts Memorial RSA.',
   },
   '/contact': {
     title: `Contact | ${SITE}`,
     description:
-      'Contact Hakaru & Districts RSA — address, phone, email, and opening hours.',
+      'Contact Hakaru & Districts Memorial RSA — address, phone, email, and opening hours.',
   },
   '/committee': {
     title: `Committee | ${SITE}`,
     description:
-      'Meet the Hakaru RSA committee and office bearers serving members and the community.',
+      'Meet the Hakaru & Districts Memorial RSA committee and office bearers serving members and the community.',
   },
   '/projects': {
     title: `Projects | ${SITE}`,
     description:
-      'Community and veteran support projects undertaken by Hakaru & Districts RSA.',
+      'Community and veteran support projects undertaken by Hakaru & Districts Memorial RSA.',
   },
   '/gallery': {
     title: `Gallery | ${SITE}`,
     description:
-      'Photo galleries from events, commemorations, and life at Hakaru RSA.',
+      'Photo galleries from events, commemorations, and life at Hakaru & Districts Memorial RSA.',
   },
   '/newsletter': {
     title: `Newsletter | ${SITE}`,
     description:
-      'Read past Hakaru RSA newsletters — club news, events, and community updates.',
+      'Read past Hakaru & Districts Memorial RSA newsletters — club news, events, and community updates.',
   },
   '/donate': {
     title: `Donate | ${SITE}`,
     description:
-      'Support Hakaru RSA with a one-off or recurring donation. Help veterans and local community programmes.',
+      'Support Hakaru & Districts Memorial RSA with a one-off or recurring donation. Help veterans and local community programmes.',
   },
   '/veteran-support': {
     title: `Veteran Support & LSA | ${SITE}`,
@@ -103,7 +103,7 @@ export function getSeoForPath(pathname) {
   if (path.startsWith('/admin')) {
     return {
       title: `Admin | ${SITE}`,
-      description: 'Hakaru RSA administration.',
+      description: 'Hakaru & Districts Memorial RSA administration.',
       noindex: true,
     };
   }

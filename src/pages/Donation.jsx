@@ -392,7 +392,7 @@ export default function Donation() {
           </h1>
           <p className="text-lg text-gray-300">
             {donatePage.intro ||
-              'Support Hakaru & Districts RSA with a donation. Your contribution helps us continue our mission.'}
+              'Support Hakaru & Districts Memorial RSA with a donation. Your contribution helps us continue our mission.'}
           </p>
         </div>
         {donatePage.imageUrl?.trim?.() ? (

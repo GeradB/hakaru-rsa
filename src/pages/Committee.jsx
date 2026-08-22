@@ -32,7 +32,7 @@ export default function Committee() {
           {cp.title || 'Executive Committee'}
         </h1>
         <p className="text-lg md:text-xl text-gray-300 text-center mb-12 max-w-2xl mx-auto">
-          {cp.subtitle || 'Hakaru & Districts RSA'}
+          {cp.subtitle || 'Hakaru & Districts Memorial RSA'}
         </p>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">

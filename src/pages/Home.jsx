@@ -93,7 +93,7 @@ export default function Home() {
           </h2>
           <p className="text-gray-400 text-center mb-12 max-w-2xl mx-auto">
             {announcements.subtitle ||
-              'Stay up to date with the latest news and happenings at Hakaru RSA'}
+              'Stay up to date with the latest news and happenings at Hakaru & Districts Memorial RSA'}
           </p>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {(announcements.items || []).map((item) => (

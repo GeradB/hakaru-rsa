@@ -96,7 +96,7 @@ export default function Contact() {
             allowFullScreen
             referrerPolicy="no-referrer-when-downgrade"
             src={`https://www.google.com/maps?q=${encodeURIComponent('733 Settlement Road, KAIWAKA 0573')}&output=embed`}
-            title="Hakaru RSA Location Map"
+            title="Hakaru & Districts Memorial RSA Location Map"
           />
         </div>
       </div>

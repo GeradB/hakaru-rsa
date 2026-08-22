@@ -1,5 +1,5 @@
 /**
- * Email templates for Hakaru & Districts RSA
+ * Email templates for Hakaru & Districts Memorial RSA
  * Generates formatted HTML emails for donations, membership applications, and renewals
  */
 
@@ -36,7 +36,7 @@ export function createDonorDonationEmail(data) {
   const donorName = donorType === 'organisation' ? (organisationName || fullName) : (fullName || 'Valued Supporter');
 
   return {
-    subject: `Thank You for Your Donation - Hakaru & Districts RSA`,
+    subject: `Thank You for Your Donation - Hakaru & Districts Memorial RSA`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -48,7 +48,7 @@ export function createDonorDonationEmail(data) {
       <body style="margin: 0; padding: 20px; background: #f3f4f6;">
         <div style="${baseStyles.container}">
           <div style="${baseStyles.header}">
-            <h1 style="${baseStyles.headerTitle}">Hakaru & Districts RSA</h1>
+            <h1 style="${baseStyles.headerTitle}">Hakaru & Districts Memorial RSA</h1>
             <p style="${baseStyles.headerSubtitle}">Donation Confirmation</p>
           </div>
 
@@ -56,7 +56,7 @@ export function createDonorDonationEmail(data) {
             <p style="font-size: 16px; margin-bottom: 20px;">Dear ${donorName},</p>
 
             <p style="margin-bottom: 20px; line-height: 1.6;">
-              Thank you for your generous donation to Hakaru & Districts RSA.
+              Thank you for your generous donation to Hakaru & Districts Memorial RSA.
               Your support helps us continue our mission of serving our community and veterans.
             </p>
 
@@ -118,12 +118,12 @@ export function createDonorDonationEmail(data) {
 
             <p style="margin-top: 20px; color: #1a365d; font-weight: 600;">
               Kind regards,<br>
-              <span style="color: #fbbf24;">Hakaru & Districts RSA</span>
+              <span style="color: #fbbf24;">Hakaru & Districts Memorial RSA</span>
             </p>
           </div>
 
           <div style="${baseStyles.footer}">
-            <p style="margin: 0;">Hakaru & Districts RSA Incorporated</p>
+            <p style="margin: 0;">Hakaru & Districts Memorial RSA Incorporated</p>
             <p style="margin: 5px 0;">Serving our community and veterans since 1946</p>
             <p style="margin: 10px 0 0;">
               <a href="mailto:admin@hakaru-rsa.org.nz" style="color: #6b7280; text-decoration: underline;">admin@hakaru-rsa.org.nz</a>
@@ -275,7 +275,7 @@ export function createAdminDonationEmail(data) {
           </div>
 
           <div style="${baseStyles.footer}">
-            <p style="margin: 0;">This is an automated notification from Hakaru RSA</p>
+            <p style="margin: 0;">This is an automated notification from Hakaru & Districts Memorial RSA</p>
             <p style="margin: 5px 0 0; font-size: 11px; color: #9ca3af;">Generated at ${new Date().toLocaleString('en-NZ')}</p>
           </div>
         </div>
@@ -297,7 +297,7 @@ export function createMembershipConfirmationEmail(data) {
   const applicantName = fullName2 ? `${fullName} & ${fullName2}` : fullName;
 
   return {
-    subject: `Membership Application Received - Hakaru & Districts RSA`,
+    subject: `Membership Application Received - Hakaru & Districts Memorial RSA`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -309,7 +309,7 @@ export function createMembershipConfirmationEmail(data) {
       <body style="margin: 0; padding: 20px; background: #f3f4f6;">
         <div style="${baseStyles.container}">
           <div style="${baseStyles.header}">
-            <h1 style="${baseStyles.headerTitle}">Hakaru & Districts RSA</h1>
+            <h1 style="${baseStyles.headerTitle}">Hakaru & Districts Memorial RSA</h1>
             <p style="${baseStyles.headerSubtitle}">Membership Application Confirmation</p>
           </div>
 
@@ -317,7 +317,7 @@ export function createMembershipConfirmationEmail(data) {
             <p style="font-size: 16px; margin-bottom: 20px;">Dear ${fullName},</p>
 
             <p style="margin-bottom: 20px; line-height: 1.6;">
-              Thank you for your application for membership to Hakaru & Districts RSA.
+              Thank you for your application for membership to Hakaru & Districts Memorial RSA.
               Your application has been received and will be processed at our next committee meeting.
             </p>
 
@@ -394,12 +394,12 @@ export function createMembershipConfirmationEmail(data) {
 
             <p style="margin-top: 20px; color: #1a365d; font-weight: 600;">
               Kind regards,<br>
-              <span style="color: #fbbf24;">Hakaru & Districts RSA</span>
+              <span style="color: #fbbf24;">Hakaru & Districts Memorial RSA</span>
             </p>
           </div>
 
           <div style="${baseStyles.footer}">
-            <p style="margin: 0;">Hakaru & Districts RSA Incorporated</p>
+            <p style="margin: 0;">Hakaru & Districts Memorial RSA Incorporated</p>
             <p style="margin: 5px 0;">Serving our community and veterans since 1946</p>
             <p style="margin: 10px 0 0;">
               <a href="mailto:admin@hakaru-rsa.org.nz" style="color: #6b7280; text-decoration: underline;">admin@hakaru-rsa.org.nz</a>
@@ -672,7 +672,7 @@ export function createAdminMembershipEmail(data) {
           </div>
 
           <div style="${baseStyles.footer}">
-            <p style="margin: 0;">This is an automated notification from Hakaru RSA</p>
+            <p style="margin: 0;">This is an automated notification from Hakaru & Districts Memorial RSA</p>
             <p style="margin: 5px 0 0; font-size: 11px; color: #9ca3af;">Generated at ${new Date().toLocaleString('en-NZ')}</p>
           </div>
         </div>
@@ -693,7 +693,7 @@ export function createRenewalConfirmationEmail(data) {
   const displayTotal = formatMoney(total);
 
   return {
-    subject: `Membership Renewal Confirmed - Hakaru & Districts RSA`,
+    subject: `Membership Renewal Confirmed - Hakaru & Districts Memorial RSA`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -705,7 +705,7 @@ export function createRenewalConfirmationEmail(data) {
       <body style="margin: 0; padding: 20px; background: #f3f4f6;">
         <div style="${baseStyles.container}">
           <div style="${baseStyles.header}">
-            <h1 style="${baseStyles.headerTitle}">Hakaru & Districts RSA</h1>
+            <h1 style="${baseStyles.headerTitle}">Hakaru & Districts Memorial RSA</h1>
             <p style="${baseStyles.headerSubtitle}">Membership Renewal Confirmed</p>
           </div>
 
@@ -713,7 +713,7 @@ export function createRenewalConfirmationEmail(data) {
             <p style="font-size: 16px; margin-bottom: 20px;">Dear ${fullName},</p>
 
             <p style="margin-bottom: 20px; line-height: 1.6;">
-              Thank you for renewing your membership with Hakaru & Districts RSA.
+              Thank you for renewing your membership with Hakaru & Districts Memorial RSA.
               Your renewal has been processed successfully.
             </p>
 
@@ -782,12 +782,12 @@ export function createRenewalConfirmationEmail(data) {
 
             <p style="margin-top: 20px; color: #1a365d; font-weight: 600;">
               Kind regards,<br>
-              <span style="color: #fbbf24;">Hakaru & Districts RSA</span>
+              <span style="color: #fbbf24;">Hakaru & Districts Memorial RSA</span>
             </p>
           </div>
 
           <div style="${baseStyles.footer}">
-            <p style="margin: 0;">Hakaru & Districts RSA Incorporated</p>
+            <p style="margin: 0;">Hakaru & Districts Memorial RSA Incorporated</p>
             <p style="margin: 5px 0;">Serving our community and veterans since 1946</p>
             <p style="margin: 10px 0 0;">
               <a href="mailto:admin@hakaru-rsa.org.nz" style="color: #6b7280; text-decoration: underline;">admin@hakaru-rsa.org.nz</a>
@@ -926,7 +926,7 @@ export function createAdminRenewalEmail(data) {
           </div>
 
           <div style="${baseStyles.footer}">
-            <p style="margin: 0;">This is an automated notification from Hakaru RSA</p>
+            <p style="margin: 0;">This is an automated notification from Hakaru & Districts Memorial RSA</p>
             <p style="margin: 5px 0 0; font-size: 11px; color: #9ca3af;">Generated at ${new Date().toLocaleString('en-NZ')}</p>
           </div>
         </div>

@@ -515,7 +515,7 @@ export default function HakaruRSARenewal() {
         <div className="text-center">
           <h1 className="text-3xl md:text-5xl font-bold font-heading text-white mb-4">Membership Renewal</h1>
           <p className="text-lg text-gray-300 max-w-2xl mx-auto">
-            Renew your Hakaru &amp; Districts RSA membership. If you have updated details, please include them below.
+            Renew your Hakaru &amp; Districts Memorial RSA membership. If you have updated details, please include them below.
           </p>
         </div>
 
@@ -742,7 +742,7 @@ export default function HakaruRSARenewal() {
             <div className="flex items-start justify-between gap-6 border-2 border-rsa-navy/10 rounded-lg p-4">
               <div>
                 <p className="font-bold text-rsa-navy">AGMs &amp; EGMs</p>
-                <p className="text-sm text-gray-600">I consent to be contacted via email for Hakaru RSA AGMs &amp; EGMs.</p>
+                <p className="text-sm text-gray-600">I consent to be contacted via email for Hakaru &amp; Districts Memorial RSA AGMs &amp; EGMs.</p>
               </div>
               <YesNoToggle value={form.consentAGM} onChange={(v) => set('consentAGM', v)} />
             </div>

@@ -153,7 +153,7 @@ export default function Gallery() {
               </h1>
               <div className="h-1 w-16 bg-rsa-gold mx-auto rounded-full mb-6" aria-hidden />
               <p className="text-gray-300 text-base md:text-lg leading-relaxed">
-                Photos from Hakaru & Districts RSA. Explore albums below — moments from our community and events.
+                Photos from Hakaru & Districts Memorial RSA. Explore albums below — moments from our community and events.
               </p>
             </div>
           </header>

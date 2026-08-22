@@ -46,7 +46,7 @@ export default function Newsletter() {
           {page.pageTitle || 'Newsletter'}
         </h1>
         <p className="text-lg md:text-xl text-gray-300 text-center mb-12 max-w-2xl mx-auto">
-          {page.pageSubtitle || 'News and updates from Hakaru & Districts RSA'}
+          {page.pageSubtitle || 'News and updates from Hakaru & Districts Memorial RSA'}
         </p>
 
         <div className="bg-white/95 backdrop-blur rounded-2xl shadow-2xl overflow-hidden mb-12 text-center">

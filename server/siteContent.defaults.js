@@ -5,7 +5,7 @@
  */
 const siteContent = {
   site: {
-    name: 'Hakaru RSA',
+    name: 'Hakaru & Districts Memorial RSA',
     tagline: 'Serving Our Veterans & Community',
   },
 
@@ -24,7 +24,7 @@ const siteContent = {
   },
 
   hero: {
-    title: 'Hakaru & Districts RSA',
+    title: 'Hakaru & Districts Memorial RSA',
     subtitle: 'Honouring Service, Supporting Veterans, Building Community',
     ctaText: 'Become a Member',
     ctaLink: '/membership/become',
@@ -32,7 +32,7 @@ const siteContent = {
   },
 
   welcome: {
-    title: 'Welcome to Hakaru RSA',
+    title: 'Welcome to Hakaru & Districts Memorial RSA',
     content:
       "The Hakaru & Districts Returned and Services Association is dedicated to supporting our veterans, active service members, and their families. We provide a welcoming space for camaraderie, support, and community connection.",
     imageUrl: '',
@@ -41,7 +41,7 @@ const siteContent = {
   announcements: {
     title: 'Announcements',
     subtitle:
-      'Stay up to date with the latest news and happenings at Hakaru RSA',
+      'Stay up to date with the latest news and happenings at Hakaru & Districts Memorial RSA',
     items: [
       {
         id: 1,
@@ -107,18 +107,18 @@ const siteContent = {
   },
 
   about: {
-    title: 'About Hakaru RSA',
+    title: 'About Hakaru & Districts Memorial RSA',
     subtitle: 'Our History & Mission',
     introImageUrl: '',
     content:
-      "The Hakaru & Districts RSA was established to serve the veterans and community of Hakaru and surrounding districts. We are committed to honouring the service and sacrifice of New Zealand's veterans while providing ongoing support and a vibrant social hub for our members.",
+      "The Hakaru & Districts Memorial RSA was established to serve the veterans and community of Hakaru and surrounding districts. We are committed to honouring the service and sacrifice of New Zealand's veterans while providing ongoing support and a vibrant social hub for our members.",
     rnzrsa: {
       title: 'RNZRSA Member',
-      content: `Hakaru and Districts RSA are a member of the RNZRSA. We welcome members from affiliated clubs throughout New Zealand and Australia & new members and families to our facilities at 733 Settlement Road, Hakaru.
+      content: `Hakaru and Districts Memorial RSA are a member of the RNZRSA. We welcome members from affiliated clubs throughout New Zealand and Australia & new members and families to our facilities at 733 Settlement Road, Hakaru.
 
 We are located no more than 10 minutes from both Kaiwaka and Mangawhai and offer our members, affiliated members and guests a great opportunity to enjoy our RSA and what it has to offer.
 
-For your enjoyment the Hakaru RSA offers you friendship, great camaraderie, pool, snooker, darts, entertainment and a restaurant & bar in a safe secure environment.
+For your enjoyment the Hakaru & Districts Memorial RSA offers you friendship, great camaraderie, pool, snooker, darts, entertainment and a restaurant & bar in a safe secure environment.
 
 We welcome all prospective members over the age of 13 to come to the RSA, check out our facilities and enjoy the friendship of our members – you are not required to be a returned service person to join.
 
@@ -195,7 +195,7 @@ We would like to acknowledge & deeply appreciate the fantastic work our voluntee
   },
 
   footer: {
-    copyright: '\u00A9 2026 Hakaru & Districts RSA. All rights reserved.',
+    copyright: '\u00A9 2026 Hakaru & Districts Memorial RSA. All rights reserved.',
     quickLinks: [
       { name: 'Home', href: '/' },
       { name: 'About', href: '/about' },
@@ -214,7 +214,7 @@ We would like to acknowledge & deeply appreciate the fantastic work our voluntee
     pageSubtitle: 'Making a difference in Hakaru and beyond',
     missionTitle: 'Our Commitment to Community',
     missionBody:
-      'The Hakaru & Districts RSA is dedicated to serving our veterans, supporting our community, and preserving the ANZAC spirit. Through our various projects and initiatives, we strive to make a positive impact on the lives of those who have served and their families.',
+      'The Hakaru & Districts Memorial RSA is dedicated to serving our veterans, supporting our community, and preserving the ANZAC spirit. Through our various projects and initiatives, we strive to make a positive impact on the lives of those who have served and their families.',
     missionImageUrl: '',
     getInvolvedTitle: 'Get Involved',
     getInvolvedBody:
@@ -308,7 +308,7 @@ We would like to acknowledge & deeply appreciate the fantastic work our voluntee
 
   committeePage: {
     title: 'Executive Committee',
-    subtitle: 'Hakaru & Districts RSA',
+    subtitle: 'Hakaru & Districts Memorial RSA',
     members: [
       {
         name: 'President Name',
@@ -359,7 +359,7 @@ We would like to acknowledge & deeply appreciate the fantastic work our voluntee
   donatePage: {
     title: 'Make a Donation',
     intro:
-      'Support Hakaru & Districts RSA with a donation. Your contribution helps us continue our mission.',
+      'Support Hakaru & Districts Memorial RSA with a donation. Your contribution helps us continue our mission.',
     successTitle: 'Thank You for Your Donation!',
     successBody:
       'Your generous donation has been received. A confirmation email will be sent shortly.',
@@ -369,7 +369,7 @@ We would like to acknowledge & deeply appreciate the fantastic work our voluntee
 
   newsletterPage: {
     pageTitle: 'Newsletter',
-    pageSubtitle: 'News and updates from Hakaru & Districts RSA',
+    pageSubtitle: 'News and updates from Hakaru & Districts Memorial RSA',
     introTitle: 'Stay informed',
     introBody:
       'Browse our past newsletters for club news, upcoming events, and community updates. New issues are added here as they are published.',
@@ -427,7 +427,7 @@ We would like to acknowledge & deeply appreciate the fantastic work our voluntee
     enquiriesLabel: 'General Enquiries',
     enquiryEmails: ['LSA@hakarursa.co.nz', 'president@hakarursa.co.nz'],
     websiteLabel: 'Official Website',
-    websiteText: 'Hakaru RSA Official Portal',
+    websiteText: 'Hakaru & Districts Memorial RSA Official Portal',
     websiteHref: '/',
   },
 };

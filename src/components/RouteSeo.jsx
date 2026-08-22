@@ -19,7 +19,7 @@ export default function RouteSeo() {
   const ogImage =
     import.meta.env.VITE_PUBLIC_OG_IMAGE_URL?.trim() || absoluteUrl('/og-image.jpg');
   const ogImageAlt =
-    'Hakaru & Districts RSA — Honouring Service, Supporting Veterans, Building Community';
+    'Hakaru & Districts Memorial RSA — Honouring Service, Supporting Veterans, Building Community';
 
   const organizationJsonLd = useMemo(
     () =>
@@ -28,7 +28,7 @@ export default function RouteSeo() {
         : {
             '@context': 'https://schema.org',
             '@type': 'Organization',
-            name: 'Hakaru RSA',
+            name: 'Hakaru & Districts Memorial RSA',
             alternateName: 'Hakaru & Districts Returned and Services Association',
             url: origin,
             logo: ogImage,
@@ -53,7 +53,7 @@ export default function RouteSeo() {
         <meta name="robots" content="index, follow" />
       )}
       <meta property="og:type" content="website" />
-      <meta property="og:site_name" content="Hakaru RSA" />
+      <meta property="og:site_name" content="Hakaru & Districts Memorial RSA" />
       <meta property="og:locale" content="en_NZ" />
       <meta property="og:title" content={title} />
       <meta property="og:description" content={description} />

@@ -551,7 +551,7 @@ export default function HakaruRSAMembership() {
               Thank you, <strong>{form.fullName}</strong>.
             </p>
             <p className="text-gray-600 mb-2">
-              Your Hakaru &amp; Districts RSA membership application has been received.
+              Your Hakaru &amp; Districts Memorial RSA membership application has been received.
             </p>
             {membershipId && (
               <div className="bg-rsa-navy/5 border border-rsa-navy/20 rounded-lg p-3 mb-6">
@@ -872,7 +872,7 @@ export default function HakaruRSAMembership() {
               <p className={sectionTitle}>Consents</p>
               <div className="space-y-1">
                 <YesNo field="consentEmail" label="I consent to be contacted via email for RSA related events." />
-                <YesNo field="consentAGM" label="I consent to be contacted via email for Hakaru & Districts RSA AGMs & EGMs." />
+                <YesNo field="consentAGM" label="I consent to be contacted via email for Hakaru & Districts Memorial RSA AGMs & EGMs." />
               </div>
             </div>
 
@@ -888,9 +888,9 @@ export default function HakaruRSAMembership() {
                 />
               </div>
               <div className="space-y-1 mt-4">
-                <YesNo field="willingTasks" label="I am willing to be contacted for tasks relating to my above skills at the Hakaru & Districts RSA." />
-                <YesNo field="willingWorkingBee" label="I am willing to be contacted for working bees at the Hakaru & Districts RSA." />
-                <YesNo field="willingDonate" label="I am willing to donate my time to the operation of the Hakaru & Districts RSA." />
+                <YesNo field="willingTasks" label="I am willing to be contacted for tasks relating to my above skills at the Hakaru & Districts Memorial RSA." />
+                <YesNo field="willingWorkingBee" label="I am willing to be contacted for working bees at the Hakaru & Districts Memorial RSA." />
+                <YesNo field="willingDonate" label="I am willing to donate my time to the operation of the Hakaru & Districts Memorial RSA." />
               </div>
             </div>
           </div>
@@ -1157,7 +1157,7 @@ export default function HakaruRSAMembership() {
         </div>
 
         <div className="text-center text-xs text-gray-400 mt-6">
-          Hakaru &amp; Districts RSA · Membership Application
+          Hakaru &amp; Districts Memorial RSA · Membership Application
         </div>
       </div>
     </div>
