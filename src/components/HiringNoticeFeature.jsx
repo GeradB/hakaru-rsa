@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { getActiveSiteNotices } from '../config/siteNotices';
 
 export default function HiringNoticeFeature() {
@@ -22,12 +21,12 @@ export default function HiringNoticeFeature() {
                 {notice.title}
               </h2>
             </div>
-            <Link
-              to={notice.contactHref}
+            <a
+              href={notice.contactHref}
               className="rounded-md bg-rsa-gold px-4 py-2 text-sm font-bold text-rsa-navy hover:bg-yellow-300 focus:ring-4 focus:ring-rsa-gold/50"
             >
               {notice.contactLabel}
-            </Link>
+            </a>
           </div>
           <img
             src={notice.imageSrc}

@@ -8,7 +8,8 @@ export const SITE_NOTICES = [
       'We are looking for an experienced Head Kitchen Cook to lead our kitchen team. Passion for good food and team spirit welcome.',
     imageSrc: '/cook-wanted.png',
     imageAlt: 'Wanted: Head Kitchen Cook at Hakaru & Districts Memorial RSA',
-    contactHref: '/contact',
+    contactHref:
+      'mailto:secretary@hakarursa.co.nz?subject=Head%20Kitchen%20Cook%20Enquiry',
     contactLabel: 'Enquire now',
   },
 ];
