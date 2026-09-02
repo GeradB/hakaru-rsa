@@ -12,7 +12,8 @@ function NoticeFlagIcon() {
 }
 
 export default function SiteNoticeBanner() {
-  const notices = getActiveSiteNotices();
+  // Stable list — do not recreate on every render (breaks RR startTransition navigations).
+  const [notices] = useState(() => getActiveSiteNotices());
   const [expanded, setExpanded] = useState(false);
   const [dismissedIds, setDismissedIds] = useState(() => new Set());
 
@@ -20,6 +21,7 @@ export default function SiteNoticeBanner() {
     const stored = notices
       .map((notice) => notice.id)
       .filter((id) => localStorage.getItem(`${DISMISS_KEY_PREFIX}${id}`) === '1');
+    if (stored.length === 0) return;
     setDismissedIds(new Set(stored));
   }, [notices]);
 

@@ -114,7 +114,9 @@ function AppContent() {
 
 function App() {
   return (
-    <Router>
+    // useTransitions={false}: avoid RR7 startTransition navigations getting starved
+    // by high-priority updates (e.g. notice banner state), which updates the URL without swapping pages.
+    <Router useTransitions={false}>
       <RouteSeo />
       <SiteContentProvider>
         <ScrollToTopOnRouteChange />
