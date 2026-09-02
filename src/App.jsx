@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import ScrollToTopButton from './components/ScrollToTop';
+import SiteNoticeBanner from './components/SiteNoticeBanner';
 import Home from './pages/Home';
 import About from './pages/About';
 import Membership from './pages/Membership';
@@ -50,6 +51,7 @@ function MainLayout() {
         Skip to main content
       </a>
       <Header />
+      <SiteNoticeBanner />
       <main id="main-content" className="flex-grow">
         <Outlet />
       </main>
