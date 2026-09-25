@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import { useSiteContent } from '../context/SiteContentContext';
-import HiringNoticeFeature from '../components/HiringNoticeFeature';
 
 /** RNZRSA wordmark — vector, sharp at any size (matches rsa.org.nz menu asset) */
 const HERO_RSA_LOGO_SRC = '/rsa-logo-source.svg';
@@ -61,8 +60,6 @@ export default function Home() {
           </Link>
         </div>
       </section>
-
-      <HiringNoticeFeature />
 
       {/* Welcome Section */}
       <section className="py-20">

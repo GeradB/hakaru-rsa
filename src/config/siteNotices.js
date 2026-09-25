@@ -2,7 +2,7 @@
 export const SITE_NOTICES = [
   {
     id: 'head-kitchen-cook-2026',
-    enabled: true,
+    enabled: false,
     title: 'Now Hiring: Head Kitchen Cook',
     summary:
       'We are looking for an experienced Head Kitchen Cook to lead our kitchen team. Passion for good food and team spirit welcome.',
