@@ -1,39 +1,18 @@
+# Disabled: duplicate of "Build and deploy Node.js app to Azure Web App - hakaru-api".
+# This workflow was failing with an invalid AZURE_WEBAPP_PUBLISH_PROFILE while the
+# primary Azure-generated workflow still deploys successfully.
+#
+# To re-enable: restore the previous on.push + jobs, and refresh the publish profile secret.
 name: Deploy Backend to Azure App Service
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'server/**'
   workflow_dispatch:
 
 jobs:
-  deploy:
+  skipped:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        working-directory: ./server
-        run: npm ci --only=production
-
-      - name: Verify CMS merge bundle (fails if siteContent.defaults.js missing or old ../shared import)
-        working-directory: ./server
+      - name: Workflow disabled
         run: |
-          test -f siteContent.defaults.js
-          ! grep -qE '\.\./shared/siteContent' cmsMerge.js
-          npm run verify:bundle
-
-      - name: Deploy to Azure Web App
-        uses: Azure/webapps-deploy@v3
-        with:
-          app-name: 'hakaru-api-fyfrgkgmh9a3c7gt'
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: './server'
+          echo "This workflow is disabled. Backend deploys via the Azure Web App workflow."
+          exit 0
