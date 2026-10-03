@@ -3,15 +3,13 @@ import { Link } from 'react-router-dom';
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { mapNominatimResult } from '../lib/nominatimAddress';
 import { getStripe } from '../lib/stripe';
-
-const MEMBERSHIP_FEES = {
-  'Returned & Service': 40,
-  'Associate (Non-Military)': 40,
-  'Youth (Under 18)': 10,
-  'Over 80s': 10,
-  'Over 90s': 0,
-  'Life Member': 0,
-};
+import {
+  BASE_MEMBERSHIP_FEES,
+  getMembershipFee,
+  getMembershipFees,
+  isHalfPricePromoActive,
+} from '../../shared/membershipPricing.js';
+import MembershipPromoBanner, { FeeDisplay } from '../components/MembershipPromoBanner';
 
 /** Matches HakaruRSAMembership.jsx input styling */
 const inputClass =
@@ -401,7 +399,10 @@ export default function HakaruRSARenewal() {
     }
   }, [debouncedPhysicalSearch, searchPhysicalAddress]);
 
-  const fee = MEMBERSHIP_FEES[form.membershipType] ?? 0;
+  const membershipFees = useMemo(() => getMembershipFees(), []);
+  const promoActive = isHalfPricePromoActive();
+  const fee = getMembershipFee(form.membershipType);
+  const baseFee = BASE_MEMBERSHIP_FEES[form.membershipType] ?? 0;
   const donationAmount = Number.isFinite(Number(form.donation)) ? Number(form.donation) : 0;
   const total = useMemo(() => fee + (donationAmount > 0 ? donationAmount : 0), [fee, donationAmount]);
 
@@ -415,8 +416,10 @@ export default function HakaruRSARenewal() {
       flow: "membership_renewal",
       membership_type: form.membershipType || "",
       applicant_email: form.email || "",
+      promo: promoActive ? "half-price-oct-dec" : "",
+      fee_nzd: String(fee),
     };
-  }, [form.membershipType, form.email]);
+  }, [form.membershipType, form.email, promoActive, fee]);
 
   const handleStripePaid = useCallback(async (paymentIntent) => {
     const apiUrl =
@@ -518,6 +521,8 @@ export default function HakaruRSARenewal() {
             Renew your Hakaru &amp; Districts Memorial RSA membership. If you have updated details, please include them below.
           </p>
         </div>
+
+        <MembershipPromoBanner />
 
         <FormSection title="Member Details">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -752,7 +757,7 @@ export default function HakaruRSARenewal() {
         <FormSection title="Membership type & payment">
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Object.entries(MEMBERSHIP_FEES).map(([type, amount]) => {
+              {Object.entries(membershipFees).map(([type, amount]) => {
                 const selected = form.membershipType === type;
                 return (
                   <label
@@ -774,9 +779,7 @@ export default function HakaruRSARenewal() {
                       </span>
                       <span className="font-bold text-rsa-navy">{type}</span>
                     </div>
-                    <span className="font-bold text-rsa-navy">
-                      {amount === 0 ? 'Free' : `$${amount.toFixed(2)}`}
-                    </span>
+                    <FeeDisplay amount={amount} baseAmount={BASE_MEMBERSHIP_FEES[type]} />
                     <input
                       type="radio"
                       className="sr-only"
@@ -808,8 +811,22 @@ export default function HakaruRSARenewal() {
 
             <div className="bg-white border-2 border-gray-200 rounded-lg overflow-hidden">
               <div className="flex justify-between items-center p-4 border-b border-gray-100">
-                <span className="text-gray-700 font-bold">Renewal fee</span>
-                <span className="text-rsa-navy font-bold">${fee.toFixed(2)}</span>
+                <span className="text-gray-700 font-bold">
+                  Renewal fee
+                  {promoActive ? (
+                    <span className="ml-2 text-xs font-bold uppercase tracking-wide text-rsa-red">
+                      Half price
+                    </span>
+                  ) : null}
+                </span>
+                <span className="text-rsa-navy font-bold inline-flex items-baseline gap-2">
+                  {promoActive && baseFee > 0 ? (
+                    <span className="text-sm font-semibold text-gray-400 line-through">
+                      ${baseFee.toFixed(2)}
+                    </span>
+                  ) : null}
+                  <span>${fee.toFixed(2)}</span>
+                </span>
               </div>
               <div className="flex justify-between items-center p-4 border-b border-gray-100">
                 <span className="text-gray-700 font-bold">Donation</span>

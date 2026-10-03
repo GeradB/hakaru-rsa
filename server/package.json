@@ -8,7 +8,8 @@
     "dev": "node --watch server.js",
     "verify:bundle": "node -e \"import('./cmsMerge.js').then(()=>console.log('cmsMerge + siteContent.defaults.js OK'))\"",
     "test:agent": "node --test agent/cmsAgentService.test.js",
-    "test:security": "node --test apexRedirect.test.js stripePayments.test.js"
+    "test:security": "node --test apexRedirect.test.js stripePayments.test.js",
+    "test:pricing": "node --test membershipPricing.test.js"
   },
   "dependencies": {
     "@azure/openai": "^2.0.0",

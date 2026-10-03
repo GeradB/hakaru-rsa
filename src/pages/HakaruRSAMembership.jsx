@@ -2,15 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import { mapNominatimResult } from "../lib/nominatimAddress";
 import { getStripe } from "../lib/stripe";
-
-const MEMBERSHIP_FEES = {
-  "Returned & Service": 40,
-  "Associate (Non-Military)": 40,
-  "Youth (Under 18)": 10,
-  "Over 80s": 10,
-  "Over 90s": 0,
-  "Life Member": 0,
-};
+import {
+  BASE_MEMBERSHIP_FEES,
+  getMembershipFee,
+  getMembershipFees,
+  isHalfPricePromoActive,
+} from "../../shared/membershipPricing.js";
+import MembershipPromoBanner, { FeeDisplay } from "../components/MembershipPromoBanner";
 
 const steps = [
   "Personal Details",
@@ -439,8 +437,11 @@ export default function HakaruRSAMembership() {
   }, [debouncedPhysicalSearch, fetchAddressSuggestions]);
 
   const isReturned = form.membershipType === "Returned & Service";
-  const baseFee = MEMBERSHIP_FEES[form.membershipType] || 0;
-  const fee = form.fullName2 ? baseFee * 2 : baseFee;
+  const membershipFees = useMemo(() => getMembershipFees(), []);
+  const promoActive = isHalfPricePromoActive();
+  const unitFee = getMembershipFee(form.membershipType);
+  const unitBaseFee = BASE_MEMBERSHIP_FEES[form.membershipType] || 0;
+  const fee = form.fullName2 ? unitFee * 2 : unitFee;
   const total = fee + (parseFloat(form.donation) || 0);
 
   const displayStep = step > 2 && !isReturned ? step - 1 : step;
@@ -452,8 +453,10 @@ export default function HakaruRSAMembership() {
       flow: "membership_application",
       membership_type: form.membershipType || "",
       applicant_email: form.email || "",
+      promo: promoActive ? "half-price-oct-dec" : "",
+      fee_nzd: String(fee),
     };
-  }, [form.membershipType, form.email]);
+  }, [form.membershipType, form.email, promoActive, fee]);
 
   const serviceYearOptions = useMemo(() => buildServiceYearList(), []);
 
@@ -616,6 +619,8 @@ export default function HakaruRSAMembership() {
               <div className="h-2 bg-rsa-gold rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
             </div>
           </div>
+
+          <MembershipPromoBanner />
 
         {/* STEP 0 — Personal Details */}
         {step === 0 && (
@@ -817,7 +822,7 @@ export default function HakaruRSAMembership() {
           <div className="space-y-6">
             <p className={sectionTitle}>Membership Type & Fees</p>
             <div className="space-y-3">
-              {Object.entries(MEMBERSHIP_FEES).map(([type, fee]) => (
+              {Object.entries(membershipFees).map(([type, typeFee]) => (
                 <label
                   key={type}
                   className={`flex items-center justify-between p-4 border-2 rounded-lg cursor-pointer transition-all ${
@@ -839,7 +844,7 @@ export default function HakaruRSAMembership() {
                       {type === "Returned & Service" && <p className="text-xs text-gray-500">Service details required</p>}
                     </div>
                   </div>
-                  <span className="font-bold text-rsa-navy text-lg">{fee === 0 ? "Free" : `$${fee}.00`}</span>
+                  <FeeDisplay amount={typeFee} baseAmount={BASE_MEMBERSHIP_FEES[type]} />
                   <input
                     type="radio"
                     className="hidden"
@@ -1045,10 +1050,24 @@ export default function HakaruRSAMembership() {
                   <span className="font-bold text-rsa-navy">{form.membershipType || "—"}</span>
                 </div>
                 <div className="flex justify-between items-center p-4 border-b border-gray-100">
-                  <span className="text-sm text-gray-600">Membership fee</span>
-                  <span className="font-bold text-rsa-navy">
-                    ${fee.toFixed(2)}
-                    {form.fullName2 && <span className="text-xs text-gray-500 ml-1">(×2 members)</span>}
+                  <span className="text-sm text-gray-600">
+                    Membership fee
+                    {promoActive ? (
+                      <span className="ml-2 text-xs font-bold uppercase tracking-wide text-rsa-red">
+                        Half price
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="font-bold text-rsa-navy inline-flex items-baseline gap-2">
+                    {promoActive && unitBaseFee > 0 ? (
+                      <span className="text-sm font-semibold text-gray-400 line-through">
+                        ${(form.fullName2 ? unitBaseFee * 2 : unitBaseFee).toFixed(2)}
+                      </span>
+                    ) : null}
+                    <span>
+                      ${fee.toFixed(2)}
+                      {form.fullName2 && <span className="text-xs text-gray-500 ml-1">(×2 members)</span>}
+                    </span>
                   </span>
                 </div>
                 <div className="p-4 border-b border-gray-100">

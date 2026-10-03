@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom';
 import { useSiteContent } from '../context/SiteContentContext';
+import { HALF_PRICE_PROMO, isHalfPricePromoActive } from '../../shared/membershipPricing.js';
 
 export default function Membership() {
   const siteContent = useSiteContent();
   const { membership } = siteContent;
+  const promoActive = isHalfPricePromoActive();
 
   return (
     <div className="py-16 md:py-24 bg-gradient-to-b from-rsa-navy via-slate-800 to-rsa-navy min-h-screen">
@@ -14,6 +16,16 @@ export default function Membership() {
         <p className="text-lg md:text-xl text-gray-300 text-center mb-12 max-w-2xl mx-auto">
           {membership.subtitle}
         </p>
+
+        {promoActive ? (
+          <div className="mb-10 rounded-2xl border-2 border-rsa-gold bg-rsa-gold px-6 py-5 text-center text-rsa-navy shadow-xl">
+            <p className="font-heading text-2xl font-bold">{HALF_PRICE_PROMO.label}</p>
+            <p className="mt-1 text-sm md:text-base">
+              Applications and renewals are half price from {HALF_PRICE_PROMO.windowLabel}.
+              Standard membership is <strong>$20/year</strong> (normally $40).
+            </p>
+          </div>
+        ) : null}
 
         {/* Membership Types */}
         <div className="grid md:grid-cols-2 gap-8 mb-12">
@@ -32,7 +44,16 @@ export default function Membership() {
               <p className={`text-4xl font-bold mb-4 ${
                 index === 0 ? 'text-rsa-gold' : 'text-rsa-navy'
               }`}>
-                {type.price}
+                {promoActive && /\$?\s*40/.test(String(type.price || '')) ? (
+                  <>
+                    <span className={`mr-3 text-2xl line-through opacity-60 ${index === 0 ? 'text-gray-300' : 'text-gray-400'}`}>
+                      $40
+                    </span>
+                    $20/year
+                  </>
+                ) : (
+                  type.price
+                )}
               </p>
               <p className={`mb-6 ${index === 0 ? 'text-gray-300' : 'text-gray-600'}`}>
                 {type.description}

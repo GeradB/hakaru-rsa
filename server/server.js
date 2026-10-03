@@ -49,6 +49,11 @@ import {
 import { uploadGalleryImage, deleteGalleryBlob, isAzureGalleryConfigured } from './galleryBlob.js';
 import { pickFragment, CMS_SLUGS } from './cmsMerge.js';
 import {
+  getPricingSnapshot,
+  getExpectedMembershipFee,
+  assertSubmittedFeeMatchesSchedule,
+} from './membershipPricing.js';
+import {
   getMergedSiteContentSafe,
   saveFragment,
   detectImageType,
@@ -525,6 +530,11 @@ app.get('/api/membership/status/:txnRef', (req, res) => {
   });
 });
 
+// GET /api/membership/pricing — current fee schedule (incl. seasonal promo)
+app.get('/api/membership/pricing', (_req, res) => {
+  res.json({ success: true, ...getPricingSnapshot() });
+});
+
 // POST /api/membership/submit
 // Submit membership application to database
 app.post('/api/membership/submit', async (req, res) => {
@@ -589,19 +599,22 @@ app.post('/api/membership/update-payment', async (req, res) => {
       return res.status(400).json({ error: 'Missing membershipId' });
     }
 
+    const donationAmt = Number.parseFloat(formData?.donation) || 0;
+    const expectedFee = getExpectedMembershipFee(formData || {});
+    const expectedTotal = Math.round((expectedFee + donationAmt) * 100) / 100;
+
     const verified = await verifyPaidPaymentIntent(stripe, {
       paymentIntentId,
-      expectedAmountNzd: amount ?? formData?.total,
+      expectedAmountNzd: expectedTotal,
       expectedCurrency: 'nzd',
     });
     const status = verified.status;
 
-    const donationAmt = Number.parseFloat(formData?.donation) || 0;
     // memberships table has amount_paid + donation, not fee/total — derive from Stripe
     const totalAmt =
       verified.amountNzd != null
         ? Number(verified.amountNzd)
-        : Number(amount) || 0;
+        : expectedTotal;
 
     const paymentData = {
       stripePaymentIntentId: verified.id,
@@ -623,7 +636,7 @@ app.post('/api/membership/update-payment', async (req, res) => {
             membership.amount_paid != null ? Number(membership.amount_paid) : totalAmt;
           const paidDonation =
             membership.donation != null ? Number(membership.donation) : donationAmt;
-          const paidFee = Math.max(0, Math.round((paidTotal - paidDonation) * 100) / 100);
+          const paidFee = expectedFee;
           await sendMembershipEmails({
             ...formData,
             fee: paidFee,
@@ -690,8 +703,24 @@ app.post('/api/renewal/submit', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    const feeErr = assertSubmittedFeeMatchesSchedule(formData, fee);
+    if (feeErr) {
+      return res.status(feeErr.statusCode).json({
+        error: feeErr.message,
+        expectedFee: feeErr.expectedFee,
+      });
+    }
+
     if (dbConfigured) {
-      const renewalId = await createRenewal({ ...formData, fee, donation, total });
+      const expectedFee = getExpectedMembershipFee(formData);
+      const donationAmt = Number.parseFloat(donation) || 0;
+      const expectedTotal = Math.round((expectedFee + donationAmt) * 100) / 100;
+      const renewalId = await createRenewal({
+        ...formData,
+        fee: expectedFee,
+        donation: donationAmt,
+        total: Number.isFinite(Number(total)) ? Number(total) : expectedTotal,
+      });
 
       console.log(`Renewal created in database: ${renewalId} for ${formData.email}`);
 
@@ -718,10 +747,17 @@ app.post('/api/renewal/update-payment', async (req, res) => {
       return res.status(400).json({ error: 'Missing renewalId' });
     }
 
-    const computedTotal =
-      donation != null || fee != null
-        ? (Number(fee) || 0) + (parseFloat(donation) || 0)
-        : amount;
+    const feeErr = assertSubmittedFeeMatchesSchedule(formData || {}, fee);
+    if (feeErr) {
+      return res.status(feeErr.statusCode).json({
+        error: feeErr.message,
+        expectedFee: feeErr.expectedFee,
+      });
+    }
+
+    const expectedFee = getExpectedMembershipFee(formData || {});
+    const donationAmt = Number.parseFloat(donation) || 0;
+    const computedTotal = Math.round((expectedFee + donationAmt) * 100) / 100;
 
     const verified = await verifyPaidPaymentIntent(stripe, {
       paymentIntentId,
@@ -734,7 +770,7 @@ app.post('/api/renewal/update-payment', async (req, res) => {
       stripePaymentIntentId: verified.id,
       paymentStatus: status,
       amountPaid: verified.amountNzd,
-      fee,
+      fee: expectedFee,
       total: Number.isFinite(Number(computedTotal)) ? Number(computedTotal) : verified.amountNzd,
       paidAt: status === 'succeeded' ? new Date().toISOString() : null,
       status: status === 'succeeded' ? 'paid' : status,
